@@ -1,0 +1,15 @@
+// models/User.js
+const mongoose = require("mongoose");
+
+const groupSchema = new mongoose.Schema({
+  groupId: { type: Number, required: true, unique: true },
+  userId: { type: Number, required: true },
+  bannedWords: { type: [String], default: [] },
+  isWelcome: { type: Boolean, default: false },
+  welcomeMessage: { type: String, default: "" },
+  isGoodbye: { type: Boolean, default: true },
+  goodbyeMessage: { type: String, default: "" },
+  joinedAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model("LatestRoseBotGroup", groupSchema);

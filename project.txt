@@ -1,0 +1,164 @@
+🧙️ Project Overview
+FOMOwl is a next-generation meme coin project built on fun, community, and real utility. Inspired by the chaos of FOMO (Fear Of Missing Out) and the wisdom of owls, FOMOwl aims to merge the viral energy of memes with the practical power of crypto tools and decentralized applications. Our mascot, a quirky yet wise cartoon owl, represents our mission: to make people laugh, invest smartly, and participate in a forward thinking crypto ecosystem.
+
+💡 Vision and Mission
+Vision: To create the most engaging and useful meme token in crypto one that stands out not just for humor, but for its ability to empower communities and build tools people actually use.
+
+
+Mission: To build a community first ecosystem that blends meme culture with decentralized tech AI, gaming, NFTs, and beyond.
+
+Fomowl Links
+
+Tg: https://t.me/FOMOWL
+
+X: https://x.com/fomowlhq 
+
+IG: https://www.instagram.com/fomowlhq 
+
+TikTok: https://www.tiktok.com/@fomowlhq 
+
+Youtube: https://www.youtube.com/@fomowlhq
+
+Core Products
+1. AI Chatbot + Moderator + Wallet Verifier
+An all in one bot for Discord and Telegram:
+Smart replies.
+
+
+🛡️ Auto moderation (toxic message filtering, spam detection).
+
+
+✨ Wallet verification (check if users hold tokens or NFTs to assign roles etc).
+
+
+🪜 Quick commands for updates, help, and memes.
+
+
+2. NFT Collection
+Limited edition FOMOwl NFTs.
+
+
+Holders get perks like early access, premium roles, and game assets.
+
+
+Built in utility in our upcoming games and apps.
+
+
+3. Gamified Platform
+Simple mobile/web game featuring FOMOwl.
+
+
+Users can earn rewards and compete for leaderboard status.
+
+
+Owls will be customizable using NFTs.
+
+
+4. Decentralized Wallet (FOMOwl Wallet)
+Token swap functionality.
+
+
+Custom interface with meme-themed branding.
+
+
+Option to integrate staking and farming in future updates.
+
+
+
+Community First
+FOMOwl is 100% community powered:
+Fair launch, no private investors or pre-mines.
+
+
+DAO style decision making planned.
+
+
+Meme contests, giveaways, and AMAs are regularly hosted.
+
+
+
+Token is deflationary: 1% burn on each transaction.
+
+
+Liquidity is locked for transparency.
+
+
+
+🚀 Roadmap
+Phase 1
+
+
+Deploy FOMOwl AI bot on Discord/Telegram
+
+
+Website and NFT launch
+
+
+Launch token
+
+
+Start meme contests
+
+
+Phase 2
+NFT utility in bot and games
+
+
+Launch first FOMOwl mini game
+
+
+FOMOwl Wallet
+
+
+Phase 3
+Governance system test
+
+
+Expand meme tools and staking
+
+
+Build community DApp dashboard
+
+
+Phase 4 and beyond
+FOMOwl 2.0 Game
+
+
+Mobile app  and Desktop 
+
+
+DAO migration
+
+
+Larger exchange listings
+
+
+
+👀 FAQs (Frequently Asked Questions)
+Q1: What is FOMOwl?
+ FOMOwl is a meme + utility token on the blockchain, powered by community and backed by real features like an AI bot, NFT marketplace, games, and a token wallet.
+
+Q2: What does the FOMOwl bot do?
+ It can chat, moderate servers, detect spam, verify wallets, and interact with users smartly.
+
+Q3: How do I verify my wallet with the bot?
+ You connect your wallet, sign a message, and the bot checks if you hold required tokens/NFTs. If verified, it assigns you roles or grants access.
+
+Q4: Where can I buy $FOWL?
+ Links to buy will be provided on the official site and social channels. Always check official sources.
+
+Q5: What are the benefits of holding NFTs?
+ NFT holders get exclusive roles, revenue share, in-game advantages, and early access to events and drops.
+
+Q6: Will FOMOwl be listed on major exchanges?
+ Yes, listings are part of the roadmap. We're starting a community first, then aiming for bigger exchanges.
+
+Q7: Is FOMOwl safe?
+ Yes. Liquidity is locked, token is fair launched, and smart contracts will be audited.
+
+Q8: Can I contribute?
+ Yes! You can help with memes, community engagement, development, and more. Reach out on Discord or Telegram.
+
+
+the developer of this great project is ibrahim Abdulsalami with username of @defichillguy on tg and @ibraheem009 on discord and his portfolio is https://ibroport.netlify.app,his email is ibsalam24@gmail.com.
+NOTE:you are answering to customers Never use vague or filler phrases like "based on the information provided to me" or "I don’t see specific details" or "in the information provided". Instead, if a question has no current answer, respond clearly and guide the user to the next best resource (like community channels, docs, or announcements).,
