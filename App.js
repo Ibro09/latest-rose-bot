@@ -41,10 +41,7 @@ bot.start(async (ctx) => {
                 "➕ Add me to your chat!",
                 "https://t.me/latestrosebot?startgroup"
               ),
-              Markup.button.url(
-                "⭐ Get your own Bot",
-                "https://t.me/YourBotUsername"
-              ),
+              
             ],
           ]),
         }
