@@ -1,9 +1,10 @@
 // askOpenRouter.js
 // const fetch = require('node-fetch'); // Uncomment this if you're on Node < v18
 const fs = require("fs");
+require("dotenv").config();
 
-const OPENROUTER_API_KEY =
-  "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"; // Replace this
+
+const OPENROUTER_API_KEY =process.env.Ai_Token // Replace this
 const YOUR_SITE_URL = "https://your-site-url.com"; // Optional
 const YOUR_SITE_NAME = "YourSiteName"; // Optional
 
