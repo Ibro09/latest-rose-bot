@@ -14,6 +14,8 @@ connectDB(process.env.MONGODB_URI);
 
 const welcomeMessages = new Map(); // { chatId: welcomeText }
 const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
+const setWelcomeState = new Map(); // chatId -> userId
+const setGoodbyeState = new Map(); // chatId -> userId
 // ======================
 // START BOT
 // ======================
@@ -64,43 +66,16 @@ bot.start(async (ctx) => {
 // ======================
 bot.command("setwelcome", async (ctx) => {
   const chatId = ctx.chat.id;
-
-  // Only allow in groups
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
     return ctx.reply("❌ This command is for groups only.");
   }
-
-  // Check if sender is admin
   const admins = await ctx.getChatAdministrators();
   const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
   if (!isAdmin) {
     return ctx.reply("🚫 Only admins can set the welcome message.");
   }
-
-  // Extract message text
-  const text = ctx.message.text.split(" ").slice(1).join(" ");
-  if (!text) {
-    return ctx.reply("❌ Usage: /setwelcome Welcome to the group, {name}!");
-  }
-
-  try {
-    await Group.findOneAndUpdate(
-      { groupId: chatId },
-      {
-        $set: {
-          welcomeMessage: text,
-          isWelcome: true, // Ensure welcome is enabled
-          userId: ctx.from.id,
-        },
-      },
-      { upsert: true, new: true }
-    );
-
-    ctx.reply("✅ Welcome message has been saved and enabled!");
-  } catch (err) {
-    console.log("Error saving welcome message:", err);
-    ctx.reply("❌ Failed to save welcome message. Please try again.");
-  }
+  setWelcomeState.set(chatId, ctx.from.id);
+  return ctx.reply("✍️ Please send the welcome message you want to set.");
 });
 
 // ======================
@@ -253,11 +228,13 @@ bot.command("mute", async (ctx) => {
     return ctx.reply("🚫 Use this command in a group.");
   }
 
-  if (!ctx.message.reply_to_message) {
-    return ctx.reply("❌ Please reply to the user you want to mute.");
+  // Check if the command is a reply to a user message
+  const replyMsg = ctx.message.reply_to_message;
+  if (!replyMsg || !replyMsg.from || replyMsg.from.is_bot) {
+    return ctx.reply("❌ Please reply to a real user's message to mute them.");
   }
 
-  const userId = ctx.message.reply_to_message.from.id;
+  const userId = replyMsg.from.id;
   const admins = await ctx.getChatAdministrators();
   const isUserAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
   const isBotAdmin = admins.some((admin) => admin.user.id === ctx.botInfo.id);
@@ -467,30 +444,8 @@ bot.command("setgoodbye", async (ctx) => {
     return ctx.reply("🚫 Only admins can set the goodbye message.");
   }
 
-  // Extract text
-  const text = ctx.message.text.split(" ").slice(1).join(" ");
-  if (!text) {
-    return ctx.reply("❌ Usage: /setgoodbye Goodbye {name}, we’ll miss you!");
-  }
-
-  try {
-    await Group.findOneAndUpdate(
-      { groupId: chatId },
-      {
-        $set: {
-          goodbyeMessage: text,
-          isGoodbye: true, // Ensure it's enabled
-          userId: ctx.from.id,
-        },
-      },
-      { upsert: true, new: true }
-    );
-
-    ctx.reply("✅ Goodbye message has been saved and enabled!");
-  } catch (err) {
-    console.log("Error saving goodbye message:", err);
-    ctx.reply("❌ Failed to save goodbye message. Please try again.");
-  }
+  setGoodbyeState.set(chatId, ctx.from.id);
+  return ctx.reply("✍️ Please send the goodbye message you want to set.");
 });
 
 // ======================
@@ -650,7 +605,11 @@ bot.on("left_chat_member", async (ctx) => {
   try {
     const group = await Group.findOne({ groupId: chatId });
 
-    if (group && group.isGoodbye && group.goodbyeMessage.trim() !== "") {
+    if (
+      group &&
+      group.isGoodbye &&
+      (group.goodbyeMessage?.trim() || group.goodbyePhotoId)
+    ) {
       const name = leftUser.first_name || "";
       const username = leftUser.username ? `@${leftUser.username}` : name;
       const by = ctx.from.username
@@ -662,7 +621,13 @@ bot.on("left_chat_member", async (ctx) => {
         .replace(/{username}/g, username)
         .replace(/{by}/g, by);
 
-      await ctx.reply(message);
+      if (group.goodbyePhotoId) {
+        await ctx.replyWithPhoto(group.goodbyePhotoId, {
+          caption: message,
+        });
+      } else {
+        await ctx.reply(message);
+      }
     }
   } catch (err) {
     console.log("Error sending goodbye message:", err);
@@ -693,18 +658,24 @@ bot.on("new_chat_members", async (ctx) => {
       welcomeMessage: group?.welcomeMessage,
     });
 
-    if (!group || !group.isWelcome || !group.welcomeMessage) {
-      console.log("⚠️ Welcome message disabled or not set.");
-      return;
+    if (!group || !group.isWelcome) return;
+
+    for (const user of newMembers) {
+      let welcomeText = group.welcomeMessage || "";
+      welcomeText = welcomeText.replace(/{name}/g, user.first_name);
+      welcomeText = welcomeText.replace(
+        /{username}/g,
+        user.username ? `@${user.username}` : user.first_name
+      );
+
+      if (group.welcomePhotoId) {
+        await ctx.replyWithPhoto(group.welcomePhotoId, {
+          caption: welcomeText,
+        });
+      } else {
+        await ctx.reply(welcomeText);
+      }
     }
-
-    newMembers.forEach((user) => {
-      const welcomeText = group.welcomeMessage
-        .replace("{name}", user.first_name)
-        .replace("{username}", user.username || user.first_name);
-
-      ctx.reply(welcomeText);
-    });
   } catch (err) {
     console.log("❌ Error in welcome handler:", err.message);
   }
@@ -789,17 +760,101 @@ bot.on("my_chat_member", async (ctx) => {
 // ======================
 bot.on("message", async (ctx) => {
   const chatId = ctx.chat.id;
-  const msg = ctx.message;
+  const userId = ctx.from.id;
+
+  // Handle welcome message setup (text or photo)
+  if (setWelcomeState.get(chatId) === userId) {
+    if (ctx.message.photo) {
+      // User sent a photo
+      const photoArray = ctx.message.photo;
+      const fileId = photoArray[photoArray.length - 1].file_id; // largest size
+      const caption = ctx.message.caption || "";
+
+      await Group.findOneAndUpdate(
+        { groupId: chatId },
+        {
+          $set: {
+            welcomeMessage: caption,
+            welcomePhotoId: fileId,
+            isWelcome: true,
+            userId: userId,
+          },
+        },
+        { upsert: true, new: true }
+      );
+      setWelcomeState.delete(chatId);
+      return ctx.reply(
+        "✅ Welcome image and caption have been saved and enabled!"
+      );
+    } else if (ctx.message.text) {
+      // User sent text only
+      await Group.findOneAndUpdate(
+        { groupId: chatId },
+        {
+          $set: {
+            welcomeMessage: ctx.message.text,
+            welcomePhotoId: null,
+            isWelcome: true,
+            userId: userId,
+          },
+        },
+        { upsert: true, new: true }
+      );
+      setWelcomeState.delete(chatId);
+      return ctx.reply("✅ Welcome message has been saved and enabled!");
+    }
+  }
+
+  // Handle goodbye message setup (text or photo)
+  if (setGoodbyeState.get(chatId) === userId) {
+    if (ctx.message.photo) {
+      const photoArray = ctx.message.photo;
+      const fileId = photoArray[photoArray.length - 1].file_id; // largest size
+      const caption = ctx.message.caption || "";
+
+      await Group.findOneAndUpdate(
+        { groupId: chatId },
+        {
+          $set: {
+            goodbyeMessage: caption,
+            goodbyePhotoId: fileId,
+            isGoodbye: true,
+            userId: userId,
+          },
+        },
+        { upsert: true, new: true }
+      );
+      setGoodbyeState.delete(chatId);
+      return ctx.reply(
+        "✅ Goodbye image and caption have been saved and enabled!"
+      );
+    } else if (ctx.message.text) {
+      await Group.findOneAndUpdate(
+        { groupId: chatId },
+        {
+          $set: {
+            goodbyeMessage: ctx.message.text,
+            goodbyePhotoId: null,
+            isGoodbye: true,
+            userId: userId,
+          },
+        },
+        { upsert: true, new: true }
+      );
+      setGoodbyeState.delete(chatId);
+      return ctx.reply("✅ Goodbye message has been saved and enabled!");
+    }
+  }
 
   // =====================================================
   // 1️⃣ BANNED WORDS CHECK
   // =====================================================
-  if (msg.text) {
+  if (ctx.message.text) {
     try {
       const group = await Group.findOne({ groupId: chatId });
 
       if (group?.bannedWords?.length) {
-        const text = msg.text.toLowerCase();
+        const text = ctx.message.text.toLowerCase();
 
         for (const word of group.bannedWords) {
           if (text.includes(word.toLowerCase())) {
@@ -821,11 +876,9 @@ bot.on("message", async (ctx) => {
   // =====================================================
   // 2️⃣ GOODBYE MESSAGE
   // =====================================================
-  if (msg.left_chat_member) {
-    const leftUser = msg.left_chat_member;
-    console.log("👤 User left:", leftUser);
-
-    const byUser = msg.from || {};
+  if (ctx.message.left_chat_member) {
+    const leftUser = ctx.message.left_chat_member;
+    const byUser = ctx.message.from || {};
     const isKicked = leftUser.id !== byUser.id;
 
     const leftName =
@@ -838,8 +891,11 @@ bot.on("message", async (ctx) => {
     try {
       const group = await Group.findOne({ groupId: chatId });
 
-      if (group?.isGoodbye && group.goodbyeMessage?.trim()) {
-        let message = group.goodbyeMessage;
+      if (
+        group?.isGoodbye &&
+        (group.goodbyeMessage?.trim() || group.goodbyePhotoId)
+      ) {
+        let message = group.goodbyeMessage || "";
         message = message.replace(/{name}/g, leftName);
         message = message.replace(
           /{username}/g,
@@ -847,7 +903,13 @@ bot.on("message", async (ctx) => {
         );
         message = message.replace(/{by}/g, isKicked ? byName : leftName);
 
-        await ctx.reply(message);
+        if (group.goodbyePhotoId) {
+          await ctx.replyWithPhoto(group.goodbyePhotoId, {
+            caption: message,
+          });
+        } else {
+          await ctx.reply(message);
+        }
       } else {
         console.log("⚠️ Goodbye message disabled or not set.");
       }
@@ -859,22 +921,31 @@ bot.on("message", async (ctx) => {
   // =====================================================
   // 3️⃣ WELCOME MESSAGE
   // =====================================================
-  if (msg.new_chat_members?.length > 0) {
-    const newMembers = msg.new_chat_members;
+  if (ctx.message.new_chat_members?.length > 0) {
+    const newMembers = ctx.message.new_chat_members;
 
     try {
       const group = await Group.findOne({ groupId: chatId });
 
-      if (group?.isWelcome && group.welcomeMessage?.trim()) {
+      if (
+        group?.isWelcome &&
+        (group.welcomeMessage?.trim() || group.welcomePhotoId)
+      ) {
         for (const user of newMembers) {
-          let welcomeText = group.welcomeMessage;
+          let welcomeText = group.welcomeMessage || "";
           welcomeText = welcomeText.replace(/{name}/g, user.first_name);
           welcomeText = welcomeText.replace(
             /{username}/g,
             user.username ? `@${user.username}` : user.first_name
           );
 
-          await ctx.reply(welcomeText);
+          if (group.welcomePhotoId) {
+            await ctx.replyWithPhoto(group.welcomePhotoId, {
+              caption: welcomeText,
+            });
+          } else {
+            await ctx.reply(welcomeText);
+          }
         }
       } else {
         console.log("⚠️ Welcome message disabled or not set.");
@@ -887,8 +958,8 @@ bot.on("message", async (ctx) => {
   // =====================================================
   // 4️⃣ BOT MENTION DETECTION
   // =====================================================
-  const messageText = msg.text || "";
-  const entities = msg.entities || [];
+  const messageText = ctx.message.text || "";
+  const entities = ctx.message.entities || [];
 
   let isBotMentioned = false;
 
@@ -931,7 +1002,7 @@ bot.on("message", async (ctx) => {
   // =====================================================
   // 5️⃣ REPLY TO BOT DETECTION
   // =====================================================
-  const replyMsg = msg.reply_to_message;
+  const replyMsg = ctx.message.reply_to_message;
   if (replyMsg && replyMsg.from && replyMsg.from.id === botId) {
     await ctx.reply("You replied to me!");
     runWhenMentioned(ctx);
