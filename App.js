@@ -31,23 +31,22 @@ bot.start(async (ctx) => {
       } else {
         console.log(`👤 Returning user: ${tgId}`);
       }
+const names = ctx.from.first_name || "there";
 
-      return ctx.reply(
-        `Hey ${name}! My name is ${ctx.botInfo.first_name} – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
-          `Join my [news channel](https://t.me/your_news_channel) to get information on all the latest updates.\n\n` 
-          ,
-        {
-          parse_mode: "MarkdownV2",
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.url(
-                "➕ Add me to your chat!",
-                "https://t.me/latestrosebot?startgroup"
-              ),
-            ],
-          ]),
-        }
-      );
+return ctx.reply(
+  `Hey <b>${name}</b>! My name is <b>${ctx.botInfo.first_name}</b> – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
+  `Join my <a href="https://t.me/your_news_channel">news channel</a> to get information on all the latest updates.\n\n`,
+  {
+    parse_mode: "HTML",
+    ...Markup.inlineKeyboard([
+      [Markup.button.url("➕ Add me to your chat!", "https://t.me/latestrosebot?startgroup")]
+    ])
+  }
+);
+
+
+
+    
     } else {
       return ctx.reply(
         "❗ Please start a private chat with me to use this command. DM me here: https://t.me/latestrosebot"
