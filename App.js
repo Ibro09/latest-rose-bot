@@ -31,33 +31,33 @@ bot.start(async (ctx) => {
       } else {
         console.log(`👤 Returning user: ${tgId}`);
       }
-const names = ctx.from.first_name || "there";
+      const names = ctx.from.first_name || "there";
 
-return ctx.reply(
-  `Hey <b>${name}</b>! My name is <b>${ctx.botInfo.first_name}</b> – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
-  `Join my <a href="https://t.me/your_news_channel">news channel</a> to get information on all the latest updates.\n\n`,
-  {
-    parse_mode: "HTML",
-    ...Markup.inlineKeyboard([
-      [Markup.button.url("➕ Add me to your chat!", "https://t.me/latestrosebot?startgroup")]
-    ])
-  }
-);
-
-
-
-    
+      return ctx.reply(
+        `Hey <b>${name}</b>! My name is <b>${ctx.botInfo.first_name}</b> – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
+          `Join my <a href="https://t.me/your_news_channel">news channel</a> to get information on all the latest updates.\n\n`,
+        {
+          parse_mode: "HTML",
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.url(
+                "➕ Add me to your chat!",
+                "https://t.me/latestrosebot?startgroup"
+              ),
+            ],
+          ]),
+        }
+      );
     } else {
       return ctx.reply(
         "❗ Please start a private chat with me to use this command. DM me here: https://t.me/latestrosebot"
       );
     }
   } catch (error) {
-    console.error("Error in /start handler:", error);
+    console.log("Error in /start handler:", error);
     return ctx.reply("⚠️ Something went wrong. Please try again later.");
   }
 });
-
 
 // ======================
 // SET WLCOME MESSAGE
@@ -98,11 +98,10 @@ bot.command("setwelcome", async (ctx) => {
 
     ctx.reply("✅ Welcome message has been saved and enabled!");
   } catch (err) {
-    console.error("Error saving welcome message:", err);
+    console.log("Error saving welcome message:", err);
     ctx.reply("❌ Failed to save welcome message. Please try again.");
   }
 });
-
 
 // ======================
 // SET TOGGLE WELCOME MESSAGE
@@ -157,11 +156,10 @@ bot.command("togglewelcome", async (ctx) => {
       } in this group.`
     );
   } catch (err) {
-    console.error("Error toggling welcome message:", err);
+    console.log("Error toggling welcome message:", err);
     ctx.reply("❌ Failed to update welcome message setting.");
   }
 });
-
 
 // ======================
 // REMOVE WELCOME MESSAGE
@@ -202,11 +200,10 @@ bot.command("removewelcome", async (ctx) => {
 
     ctx.reply("✅ Welcome message removed successfully.");
   } catch (err) {
-    console.error("Error removing welcome message:", err);
+    console.log("Error removing welcome message:", err);
     ctx.reply("❌ Failed to remove the welcome message. Please try again.");
   }
 });
-
 
 // ======================
 // BAN USER
@@ -240,11 +237,10 @@ bot.command("ban", async (ctx) => {
     await ctx.banChatMember(userId); // Use `banChatMember` instead of deprecated `kickChatMember`
     await ctx.reply("✅ User has been banned.");
   } catch (error) {
-    console.error("Ban Error:", error);
+    console.log("Ban Error:", error);
     ctx.reply("❌ Failed to ban user. Make sure I have ban permissions.");
   }
 });
-
 
 // ======================
 // MUTE USER
@@ -289,11 +285,10 @@ bot.command("mute", async (ctx) => {
 
     ctx.reply("🔇 User has been muted for 2 hours.");
   } catch (err) {
-    console.error("Mute Error:", err);
+    console.log("Mute Error:", err);
     ctx.reply("❌ Failed to mute. Check my permissions.");
   }
 });
-
 
 // ======================
 // UNMUTE USER
@@ -329,11 +324,10 @@ bot.command("unmute", async (ctx) => {
 
     ctx.reply(`🔊 User has been unmuted.`);
   } catch (err) {
-    console.error(err);
+    console.log(err);
     ctx.reply("❌ Failed to unmute. Make sure I have admin rights.");
   }
 });
-
 
 // ======================
 // ADD FILTER
@@ -374,7 +368,6 @@ bot.command("addfilter", async (ctx) => {
   }
 });
 
-
 // ======================
 // HELP
 // ======================
@@ -402,7 +395,6 @@ bot.command("help", async (ctx) => {
 
   ctx.reply(helpMessage, { parse_mode: "Markdown" });
 });
-
 
 // ======================
 // REMOVE FILTER
@@ -438,7 +430,6 @@ bot.command("removefilter", async (ctx) => {
   ctx.reply(`🗑️ Filter removed: \`${word}\``, { parse_mode: "Markdown" });
 });
 
-
 // ======================
 // LIST FILTER
 // ======================
@@ -457,7 +448,6 @@ bot.command("listfilters", async (ctx) => {
   const list = group.bannedWords.map((f, i) => `${i + 1}. \`${f}\``).join("\n");
   ctx.reply(`🚫 Banned words/links:\n${list}`, { parse_mode: "Markdown" });
 });
-
 
 // ======================
 // SET GOODBYE MESSAGE
@@ -498,7 +488,7 @@ bot.command("setgoodbye", async (ctx) => {
 
     ctx.reply("✅ Goodbye message has been saved and enabled!");
   } catch (err) {
-    console.error("Error saving goodbye message:", err);
+    console.log("Error saving goodbye message:", err);
     ctx.reply("❌ Failed to save goodbye message. Please try again.");
   }
 });
@@ -555,7 +545,7 @@ bot.command("togglegoodbye", async (ctx) => {
       } in this group.`
     );
   } catch (err) {
-    console.error("Error toggling goodbye message:", err);
+    console.log("Error toggling goodbye message:", err);
     ctx.reply("❌ Failed to update goodbye message setting.");
   }
 });
@@ -595,7 +585,7 @@ bot.command("removegoodbye", async (ctx) => {
 
     ctx.reply("✅ Goodbye message removed successfully.");
   } catch (err) {
-    console.error("Error removing goodbye message:", err);
+    console.log("Error removing goodbye message:", err);
     ctx.reply("❌ Failed to remove the goodbye message. Please try again.");
   }
 });
@@ -675,7 +665,7 @@ bot.on("left_chat_member", async (ctx) => {
       await ctx.reply(message);
     }
   } catch (err) {
-    console.error("Error sending goodbye message:", err);
+    console.log("Error sending goodbye message:", err);
   }
 });
 
@@ -716,10 +706,9 @@ bot.on("new_chat_members", async (ctx) => {
       ctx.reply(welcomeText);
     });
   } catch (err) {
-    console.error("❌ Error in welcome handler:", err.message);
+    console.log("❌ Error in welcome handler:", err.message);
   }
 });
-
 
 // ======================
 // UPDATED CHAT MEMBER
@@ -764,7 +753,7 @@ bot.on("my_chat_member", async (ctx) => {
         { parse_mode: "Markdown" }
       );
     } catch (err) {
-      console.error("❌ Failed to send welcome message in group:", err);
+      console.log("❌ Failed to send welcome message in group:", err);
     }
 
     // Save to DB
@@ -776,7 +765,7 @@ bot.on("my_chat_member", async (ctx) => {
       );
       console.log(`📦 Group "${chat.title}" saved to DB.`);
     } catch (err) {
-      console.error("❌ Failed to save group to DB:", err);
+      console.log("❌ Failed to save group to DB:", err);
     }
 
     // Bot was removed from a group
@@ -790,11 +779,11 @@ bot.on("my_chat_member", async (ctx) => {
       await Group.deleteOne({ groupId: chat.id });
       console.log(`🗑️ Group "${chat.title}" removed from DB.`);
     } catch (err) {
-      console.error("❌ Failed to remove group from DB:", err);
+      console.log("❌ Failed to remove group from DB:", err);
     }
   }
-})
- 
+});
+
 // ======================
 // MESSAGE
 // ======================
@@ -818,14 +807,14 @@ bot.on("message", async (ctx) => {
               await ctx.deleteMessage();
               console.log(`🛑 Deleted message with banned word: ${word}`);
             } catch (err) {
-              console.error("❌ Failed to delete message:", err.message);
+              console.log("❌ Failed to delete message:", err.message);
             }
             break;
           }
         }
       }
     } catch (err) {
-      console.error("⚠️ Error in banned words check:", err.message);
+      console.log("⚠️ Error in banned words check:", err.message);
     }
   }
 
@@ -863,7 +852,7 @@ bot.on("message", async (ctx) => {
         console.log("⚠️ Goodbye message disabled or not set.");
       }
     } catch (err) {
-      console.error("⚠️ Error sending goodbye message:", err.message);
+      console.log("⚠️ Error sending goodbye message:", err.message);
     }
   }
 
@@ -891,7 +880,7 @@ bot.on("message", async (ctx) => {
         console.log("⚠️ Welcome message disabled or not set.");
       }
     } catch (err) {
-      console.error("❌ Error in welcome handler:", err.message);
+      console.log("❌ Error in welcome handler:", err.message);
     }
   }
 
@@ -985,13 +974,13 @@ bot.on("message", async (ctx) => {
               { parse_mode: "Markdown" }
             );
           } catch (err) {
-            console.error("Failed to mute spammer:", err);
+            console.log("Failed to mute spammer:", err);
           }
           groupMap[userId] = []; // Reset count after mute
         }
       }
     } catch (err) {
-      console.error("Spam check error:", err);
+      console.log("Spam check error:", err);
     }
   }
 });
