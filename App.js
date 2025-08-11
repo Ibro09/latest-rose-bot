@@ -37,7 +37,7 @@ bot.start(async (ctx) => {
           `Join my [news channel](https://t.me/your_news_channel) to get information on all the latest updates.\n\n` 
           ,
         {
-          parse_mode: "Markdown",
+          parse_mode: "MarkdownV2",
           ...Markup.inlineKeyboard([
             [
               Markup.button.url(
