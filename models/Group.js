@@ -9,7 +9,9 @@ const groupSchema = new mongoose.Schema({
   welcomeMessage: { type: String, default: "" },
   isGoodbye: { type: Boolean, default: true },
   goodbyeMessage: { type: String, default: "" },
+  spam:{type: Boolean, default: false},
   joinedAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model("LatestRoseBotGroup", groupSchema);
+  

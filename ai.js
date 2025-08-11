@@ -3,8 +3,8 @@
 const fs = require("fs");
 require("dotenv").config();
 
-
-const OPENROUTER_API_KEY =process.env.Ai_Token // Replace this
+ 
+const OPENROUTER_API_KEY =process.env.Ai_Token; // Replace this
 const YOUR_SITE_URL = "https://your-site-url.com"; // Optional
 const YOUR_SITE_NAME = "YourSiteName"; // Optional
 
@@ -43,12 +43,12 @@ If something is unknown, say so confidently and offer where or when the user can
       }),
     }
   );
-
+ 
   const data = await response.json();
   console.log("💬 Response:", data.choices[0].message.content);
   await ctx.reply(data.choices[0].message.content, {
     parse_mode: "Markdown",
   });
 }
-
+ 
 module.exports = askOpenRouter;

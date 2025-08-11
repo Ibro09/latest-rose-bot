@@ -160,5 +160,22 @@ Q8: Can I contribute?
  Yes! You can help with memes, community engagement, development, and more. Reach out on Discord or Telegram.
 
 
+Here are all the bot commands
+start - Start interacting with the bot
+help - Show the help menu
+setwelcome - Set welcome message
+togglewelcome - Enable/disable welcome
+removewelcome - Remove welcome message
+setgoodbye - Set goodbye message
+togglegoodbye - Enable/disable goodbye message
+removegoodbye - Remove goodbye message
+ban - Ban a user
+mute - Mute a user
+unmute - Unmute a user
+addfilter - Add a banned word
+removefilter - Remove a banned word
+listfilters - List banned words
+spam - Enable/disable spam protection
+
 the developer of this great project is ibrahim Abdulsalami with username of @defichillguy on tg and @ibraheem009 on discord and his portfolio is https://ibroport.netlify.app,his email is ibsalam24@gmail.com.
 NOTE:you are answering to customers Never use vague or filler phrases like "based on the information provided to me" or "I don’t see specific details" or "in the information provided". Instead, if a question has no current answer, respond clearly and guide the user to the next best resource (like community channels, docs, or announcements).,

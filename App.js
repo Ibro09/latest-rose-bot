@@ -7,13 +7,16 @@ const Group = require("./models/Group"); // adjust path as needed
 const askOpenRouter = require("./ai.js"); // adjust path as needed
 // Access env variables
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const botUsername = "latestrosebot"; // without @;
+let botUsername = "latestrosebot"; // without @;
 
 // Connect to MongoDB
 connectDB(process.env.MONGODB_URI);
 
 const welcomeMessages = new Map(); // { chatId: welcomeText }
-
+const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
+// ======================
+// START BOT
+// ======================
 bot.start(async (ctx) => {
   try {
     if (ctx.chat.type === "private") {
@@ -31,8 +34,8 @@ bot.start(async (ctx) => {
 
       return ctx.reply(
         `Hey ${name}! My name is ${ctx.botInfo.first_name} – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
-          `Join my [news channel](https://t.me/your_news_channel) to get information on all the latest updates.\n\n` +
-          `Check /privacy to view the privacy policy, and interact with your data.`,
+          `Join my [news channel](https://t.me/your_news_channel) to get information on all the latest updates.\n\n` 
+          ,
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
@@ -41,7 +44,6 @@ bot.start(async (ctx) => {
                 "➕ Add me to your chat!",
                 "https://t.me/latestrosebot?startgroup"
               ),
-              
             ],
           ]),
         }
@@ -57,6 +59,10 @@ bot.start(async (ctx) => {
   }
 });
 
+
+// ======================
+// SET WLCOME MESSAGE
+// ======================
 bot.command("setwelcome", async (ctx) => {
   const chatId = ctx.chat.id;
 
@@ -98,6 +104,10 @@ bot.command("setwelcome", async (ctx) => {
   }
 });
 
+
+// ======================
+// SET TOGGLE WELCOME MESSAGE
+// ======================
 bot.command("togglewelcome", async (ctx) => {
   const chatId = ctx.chat.id;
 
@@ -153,6 +163,10 @@ bot.command("togglewelcome", async (ctx) => {
   }
 });
 
+
+// ======================
+// REMOVE WELCOME MESSAGE
+// ======================
 bot.command("removewelcome", async (ctx) => {
   const chatId = ctx.chat.id;
 
@@ -194,6 +208,10 @@ bot.command("removewelcome", async (ctx) => {
   }
 });
 
+
+// ======================
+// BAN USER
+// ======================
 bot.command("ban", async (ctx) => {
   if (
     !ctx.chat ||
@@ -228,6 +246,10 @@ bot.command("ban", async (ctx) => {
   }
 });
 
+
+// ======================
+// MUTE USER
+// ======================
 bot.command("mute", async (ctx) => {
   if (
     !ctx.chat ||
@@ -273,6 +295,10 @@ bot.command("mute", async (ctx) => {
   }
 });
 
+
+// ======================
+// UNMUTE USER
+// ======================
 bot.command("unmute", async (ctx) => {
   if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
     return ctx.reply("🚫 The /unmute command can only be used in groups.");
@@ -309,6 +335,10 @@ bot.command("unmute", async (ctx) => {
   }
 });
 
+
+// ======================
+// ADD FILTER
+// ======================
 bot.command("addfilter", async (ctx) => {
   const chat = ctx.chat;
   const from = ctx.from;
@@ -345,6 +375,39 @@ bot.command("addfilter", async (ctx) => {
   }
 });
 
+
+// ======================
+// HELP
+// ======================
+bot.command("help", async (ctx) => {
+  const helpMessage = `
+🤖 *Bot Commands*
+/start - Start interacting with the bot
+/help - Show this help menu
+/setwelcome - Set welcome message
+/togglewelcome - Enable/disable welcome message
+/removewelcome - Remove welcome message
+/setgoodbye - Set goodbye message
+/togglegoodbye - Enable/disable goodbye message
+/removegoodbye - Remove goodbye message
+/ban - 🚫 Ban a user (reply to user)
+/mute - 🔇 Mute a user (reply to user)
+/unmute - 🔊 Unmute a user (reply to user)
+/addfilter - ➕ Add a banned word
+/removefilter - ➖ Remove a banned word
+/listfilters - 📃 List banned words
+/spam - 🛡️ Enable/disable spam protection
+
+💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
+`;
+
+  ctx.reply(helpMessage, { parse_mode: "Markdown" });
+});
+
+
+// ======================
+// REMOVE FILTER
+// ======================
 bot.command("removefilter", async (ctx) => {
   const chat = ctx.chat;
   const from = ctx.from;
@@ -376,6 +439,10 @@ bot.command("removefilter", async (ctx) => {
   ctx.reply(`🗑️ Filter removed: \`${word}\``, { parse_mode: "Markdown" });
 });
 
+
+// ======================
+// LIST FILTER
+// ======================
 bot.command("listfilters", async (ctx) => {
   const chat = ctx.chat;
 
@@ -391,122 +458,231 @@ bot.command("listfilters", async (ctx) => {
   const list = group.bannedWords.map((f, i) => `${i + 1}. \`${f}\``).join("\n");
   ctx.reply(`🚫 Banned words/links:\n${list}`, { parse_mode: "Markdown" });
 });
+
+
+// ======================
+// SET GOODBYE MESSAGE
+// ======================
+bot.command("setgoodbye", async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  // Only allow in groups
+  if (!["group", "supergroup"].includes(ctx.chat.type)) {
+    return ctx.reply("❌ This command is for groups only.");
+  }
+
+  // Check admin
+  const admins = await ctx.getChatAdministrators();
+  const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
+  if (!isAdmin) {
+    return ctx.reply("🚫 Only admins can set the goodbye message.");
+  }
+
+  // Extract text
+  const text = ctx.message.text.split(" ").slice(1).join(" ");
+  if (!text) {
+    return ctx.reply("❌ Usage: /setgoodbye Goodbye {name}, we’ll miss you!");
+  }
+
+  try {
+    await Group.findOneAndUpdate(
+      { groupId: chatId },
+      {
+        $set: {
+          goodbyeMessage: text,
+          isGoodbye: true, // Ensure it's enabled
+          userId: ctx.from.id,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    ctx.reply("✅ Goodbye message has been saved and enabled!");
+  } catch (err) {
+    console.error("Error saving goodbye message:", err);
+    ctx.reply("❌ Failed to save goodbye message. Please try again.");
+  }
+});
+
+// ======================
+// TOGGLE GOODBYE MESSAGE
+// ======================
+bot.command("togglegoodbye", async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  if (!["group", "supergroup"].includes(ctx.chat.type)) {
+    return ctx.reply("❌ This command can only be used in groups.");
+  }
+
+  const admins = await ctx.getChatAdministrators();
+  const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
+  if (!isAdmin) {
+    return ctx.reply("🚫 Only admins can toggle goodbye messages.");
+  }
+
+  const input = ctx.message.text.split(" ")[1]?.toLowerCase();
+  if (!["on", "off"].includes(input)) {
+    return ctx.reply("❌ Usage: /togglegoodbye on | off");
+  }
+
+  const isEnabled = input === "on";
+
+  try {
+    const group = await Group.findOne({ groupId: chatId });
+
+    if (
+      isEnabled &&
+      (!group || !group.goodbyeMessage || group.goodbyeMessage.trim() === "")
+    ) {
+      return ctx.reply(
+        "⚠️ You need to set a goodbye message first using /setgoodbye before enabling it."
+      );
+    }
+
+    await Group.findOneAndUpdate(
+      { groupId: chatId },
+      {
+        $set: {
+          isGoodbye: isEnabled,
+          userId: ctx.from.id,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    ctx.reply(
+      `✅ Goodbye messages are now ${
+        isEnabled ? "enabled" : "disabled"
+      } in this group.`
+    );
+  } catch (err) {
+    console.error("Error toggling goodbye message:", err);
+    ctx.reply("❌ Failed to update goodbye message setting.");
+  }
+});
+
+// ======================
+// REMOVE GOODBYE MESSAGE
+// ======================
+bot.command("removegoodbye", async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  if (!["group", "supergroup"].includes(ctx.chat.type)) {
+    return ctx.reply("❌ This command can only be used in groups.");
+  }
+
+  const admins = await ctx.getChatAdministrators();
+  const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
+
+  if (!isAdmin) {
+    return ctx.reply("🚫 Only admins can remove the goodbye message.");
+  }
+
+  try {
+    const result = await Group.findOneAndUpdate(
+      { groupId: chatId },
+      {
+        $set: {
+          goodbyeMessage: "",
+          isGoodbye: false,
+        },
+      },
+      { new: true }
+    );
+
+    if (!result) {
+      return ctx.reply("ℹ️ No goodbye message was set for this group.");
+    }
+
+    ctx.reply("✅ Goodbye message removed successfully.");
+  } catch (err) {
+    console.error("Error removing goodbye message:", err);
+    ctx.reply("❌ Failed to remove the goodbye message. Please try again.");
+  }
+});
+
 let botId = null;
 
 bot.telegram.getMe().then((botInfo) => {
   botId = botInfo.id;
   console.log("Bot ID:", botId);
 });
-// Message handler
-bot.on("message", async (ctx) => {
-  const chatId = ctx.chat.id;
-  const msg = ctx.message;
-  const group = await Group.findOne({ groupId: chatId });
-  if (!group || !group.bannedWords.length || !msg.text) return;
+// Cache bot info once
+(async () => {
+  const me = await bot.telegram.getMe();
+  botUsername = me.username;
+  botId = me.id;
+})();
 
-  const text = msg.text.toLowerCase();
-
-  for (const word of group.bannedWords) {
-    if (text.includes(word)) {
-      try {
-        await ctx.deleteMessage();
-        console.log(`Deleted message with banned word: ${word}`);
-      } catch (err) {
-        console.error("❌ Failed to delete message:", err.message);
-      }
-      break;
-    }
+// ======================
+// SPAM PROTECTION TOGGLE
+// ======================
+bot.command("spam", async (ctx) => {
+  if (!["group", "supergroup"].includes(ctx.chat.type)) {
+    return ctx.reply("❌ This command can only be used in groups.");
   }
-  // 👋 User Left or Was Removed
-  if (msg.left_chat_member) {
-    const leftUser = msg.left_chat_member;
-    const byUser = msg.from;
-
-    console.log("👤 User who left:", leftUser);
-    console.log("🔧 Action done by:", byUser);
-
-    const isKicked = leftUser.id !== byUser.id;
-
-    const leftName = `${leftUser.first_name || ""} ${
-      leftUser.last_name || ""
-    }`.trim();
-    const byName = `${byUser.first_name || ""} ${
-      byUser.last_name || ""
-    }`.trim();
-
-    try {
-      const group = await Group.findOne({ groupId: chatId });
-
-      if (!group || !group.isGoodbye || !group.goodbyeMessage) return;
-
-      const message = group.goodbyeMessage
-        .replace("{name}", leftName)
-        .replace("{username}", leftUser.username || leftUser.first_name);
-
-      await ctx.reply(message);
-    } catch (err) {
-      console.error("⚠️ Error sending goodbye message:", err.message);
-    }
+  const admins = await ctx.getChatAdministrators();
+  const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
+  if (!isAdmin) {
+    return ctx.reply("🚫 Only admins can toggle spam protection.");
   }
-  if (msg.new_chat_members && msg.new_chat_members.length > 0) {
-    const newMembers = ctx.message.new_chat_members;
-
-    console.log("📥 New members joined:", msg.new_chat_members);
-    try {
-      const group = await Group.findOne({ groupId: chatId });
-
-      console.log("🛠 Group settings:", {
-        isWelcome: group?.isWelcome,
-        welcomeMessage: group?.welcomeMessage,
-      });
-
-      if (!group || !group.isWelcome || !group.welcomeMessage) {
-        console.log("⚠️ Welcome message disabled or not set.");
-        return;
-      }
-
-      newMembers.forEach((user) => {
-        const welcomeText = group.welcomeMessage
-          .replace("{name}", user.first_name)
-          .replace("{username}", `@${user.username}` || user.first_name);
-
-        ctx.reply(welcomeText);
-      });
-    } catch (err) {
-      console.error("❌ Error in welcome handler:", err.message);
-    }
+  const input = ctx.message.text.split(" ")[1]?.toLowerCase();
+  if (!["on", "off"].includes(input)) {
+    return ctx.reply("❌ Usage: /spam on | off");
   }
-   const messageText = ctx.message.text;
-
-  // Check if the bot was mentioned in the message
-  const entities = ctx.message.entities || [];
-  const isBotMentioned = entities.some((entity) => {
-    return (
-      entity.type === "mention" &&
-      messageText.slice(entity.offset + 1, entity.offset + entity.length) === botUsername
-    );
-  });
-
-  if (isBotMentioned) {
-    // Run your function here
-    await ctx.reply("You mentioned me?");
-    runWhenMentioned(ctx);
-  }
-   const replyMsg = ctx.message.reply_to_message;
-
-  // Check if the message is a reply
-  if (replyMsg && replyMsg.from && replyMsg.from.id === botId) {
-    await ctx.reply("You replied to me!");
-    runWhenMentioned(ctx);
-  }
+  const enabled = input === "on";
+  await Group.findOneAndUpdate(
+    { groupId: ctx.chat.id },
+    { $set: { spam: enabled } },
+    { upsert: true }
+  );
+  ctx.reply(
+    `🛡️ Spam protection is now ${
+      enabled ? "enabled" : "disabled"
+    } in this group.`
+  );
 });
 
+// Place this near the top of your file (outside the handler)
 
 async function runWhenMentioned(ctx) {
   console.log("Bot was tagged in:", ctx.message.text);
-  askOpenRouter(ctx, ctx.message.text)
+  askOpenRouter(ctx, ctx.message.text);
 }
 
+// ======================
+// USER THAT LEFT
+// ======================
+bot.on("left_chat_member", async (ctx) => {
+  const chatId = ctx.chat.id;
+  const leftUser = ctx.message.left_chat_member;
+  console.log(leftUser);
+
+  try {
+    const group = await Group.findOne({ groupId: chatId });
+
+    if (group && group.isGoodbye && group.goodbyeMessage.trim() !== "") {
+      const name = leftUser.first_name || "";
+      const username = leftUser.username ? `@${leftUser.username}` : name;
+      const by = ctx.from.username
+        ? `@${ctx.from.username}`
+        : ctx.from.first_name || "Someone";
+
+      const message = group.goodbyeMessage
+        .replace(/{name}/g, name)
+        .replace(/{username}/g, username)
+        .replace(/{by}/g, by);
+
+      await ctx.reply(message);
+    }
+  } catch (err) {
+    console.error("Error sending goodbye message:", err);
+  }
+});
+
+// ======================
+// NEW USER
+// ======================
 bot.on("new_chat_members", async (ctx) => {
   const chatId = ctx.chat.id;
   const newMembers = ctx.message.new_chat_members;
@@ -545,6 +721,10 @@ bot.on("new_chat_members", async (ctx) => {
   }
 });
 
+
+// ======================
+// UPDATED CHAT MEMBER
+// ======================
 bot.on("my_chat_member", async (ctx) => {
   const oldStatus = ctx.update.my_chat_member.old_chat_member.status;
   const newStatus = ctx.update.my_chat_member.new_chat_member.status;
@@ -614,15 +794,207 @@ bot.on("my_chat_member", async (ctx) => {
       console.error("❌ Failed to remove group from DB:", err);
     }
   }
-});
+})
+ 
+// ======================
+// MESSAGE
+// ======================
+bot.on("message", async (ctx) => {
+  const chatId = ctx.chat.id;
+  const msg = ctx.message;
 
+  // =====================================================
+  // 1️⃣ BANNED WORDS CHECK
+  // =====================================================
+  if (msg.text) {
+    try {
+      const group = await Group.findOne({ groupId: chatId });
 
+      if (group?.bannedWords?.length) {
+        const text = msg.text.toLowerCase();
 
-// Optional /help
-bot.help((ctx) => {
-  ctx.reply(
-    "Available commands:\n/start - Start the bot\n/help - Show this message"
-  );
+        for (const word of group.bannedWords) {
+          if (text.includes(word.toLowerCase())) {
+            try {
+              await ctx.deleteMessage();
+              console.log(`🛑 Deleted message with banned word: ${word}`);
+            } catch (err) {
+              console.error("❌ Failed to delete message:", err.message);
+            }
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("⚠️ Error in banned words check:", err.message);
+    }
+  }
+
+  // =====================================================
+  // 2️⃣ GOODBYE MESSAGE
+  // =====================================================
+  if (msg.left_chat_member) {
+    const leftUser = msg.left_chat_member;
+    console.log("👤 User left:", leftUser);
+
+    const byUser = msg.from || {};
+    const isKicked = leftUser.id !== byUser.id;
+
+    const leftName =
+      `${leftUser.first_name || ""} ${leftUser.last_name || ""}`.trim() ||
+      "Someone";
+    const byName =
+      `${byUser.first_name || ""} ${byUser.last_name || ""}`.trim() ||
+      "an admin";
+
+    try {
+      const group = await Group.findOne({ groupId: chatId });
+
+      if (group?.isGoodbye && group.goodbyeMessage?.trim()) {
+        let message = group.goodbyeMessage;
+        message = message.replace(/{name}/g, leftName);
+        message = message.replace(
+          /{username}/g,
+          leftUser.username ? `@${leftUser.username}` : leftName
+        );
+        message = message.replace(/{by}/g, isKicked ? byName : leftName);
+
+        await ctx.reply(message);
+      } else {
+        console.log("⚠️ Goodbye message disabled or not set.");
+      }
+    } catch (err) {
+      console.error("⚠️ Error sending goodbye message:", err.message);
+    }
+  }
+
+  // =====================================================
+  // 3️⃣ WELCOME MESSAGE
+  // =====================================================
+  if (msg.new_chat_members?.length > 0) {
+    const newMembers = msg.new_chat_members;
+
+    try {
+      const group = await Group.findOne({ groupId: chatId });
+
+      if (group?.isWelcome && group.welcomeMessage?.trim()) {
+        for (const user of newMembers) {
+          let welcomeText = group.welcomeMessage;
+          welcomeText = welcomeText.replace(/{name}/g, user.first_name);
+          welcomeText = welcomeText.replace(
+            /{username}/g,
+            user.username ? `@${user.username}` : user.first_name
+          );
+
+          await ctx.reply(welcomeText);
+        }
+      } else {
+        console.log("⚠️ Welcome message disabled or not set.");
+      }
+    } catch (err) {
+      console.error("❌ Error in welcome handler:", err.message);
+    }
+  }
+
+  // =====================================================
+  // 4️⃣ BOT MENTION DETECTION
+  // =====================================================
+  const messageText = msg.text || "";
+  const entities = msg.entities || [];
+
+  let isBotMentioned = false;
+
+  // Quick text match
+  if (
+    botUsername &&
+    messageText.toLowerCase().includes(`@${botUsername.toLowerCase()}`)
+  ) {
+    isBotMentioned = true;
+  }
+
+  // Entity-based check
+  for (const entity of entities) {
+    const entityText = messageText
+      .slice(entity.offset, entity.offset + entity.length)
+      .toLowerCase();
+
+    if (
+      entity.type === "mention" &&
+      entityText === `@${botUsername.toLowerCase()}`
+    ) {
+      isBotMentioned = true;
+    }
+    if (
+      entity.type === "bot_command" &&
+      entityText.includes(`@${botUsername.toLowerCase()}`)
+    ) {
+      isBotMentioned = true;
+    }
+    if (entity.type === "text_mention" && entity.user.id === botId) {
+      isBotMentioned = true;
+    }
+  }
+
+  if (isBotMentioned) {
+    await ctx.reply("You mentioned me?");
+    runWhenMentioned(ctx);
+  }
+
+  // =====================================================
+  // 5️⃣ REPLY TO BOT DETECTION
+  // =====================================================
+  const replyMsg = msg.reply_to_message;
+  if (replyMsg && replyMsg.from && replyMsg.from.id === botId) {
+    await ctx.reply("You replied to me!");
+    runWhenMentioned(ctx);
+  }
+
+  // =====================================================
+  // 6️⃣ SPAM DETECTION & MUTE
+  // =====================================================
+  if (
+    ["group", "supergroup"].includes(ctx.chat.type) &&
+    ctx.from &&
+    !ctx.from.is_bot
+  ) {
+    try {
+      const group = await Group.findOne({ groupId: chatId });
+      if (group?.spam) {
+        const userId = ctx.from.id;
+        const now = Date.now();
+        if (!userSpamMap.has(chatId)) userSpamMap.set(chatId, {});
+        const groupMap = userSpamMap.get(chatId);
+        if (!groupMap[userId]) groupMap[userId] = [];
+        // Keep only timestamps within the last 60 seconds
+        groupMap[userId] = groupMap[userId].filter((t) => now - t < 60 * 1000);
+        groupMap[userId].push(now);
+
+        if (groupMap[userId].length >= 10) {
+          // Mute user for 1 minute
+          try {
+            await ctx.restrictChatMember(userId, {
+              permissions: {
+                can_send_messages: false,
+                can_send_media_messages: false,
+                can_send_other_messages: false,
+                can_add_web_page_previews: false,
+              },
+              until_date: Math.floor(now / 1000) + 60,
+            });
+            ctx.reply(
+              `🤖 User [${ctx.from.first_name}](tg://user?id=${userId}) has been muted for 1 minute for spamming.`,
+              { parse_mode: "Markdown" }
+            );
+          } catch (err) {
+            console.error("Failed to mute spammer:", err);
+          }
+          groupMap[userId] = []; // Reset count after mute
+        }
+      }
+    } catch (err) {
+      console.error("Spam check error:", err);
+    }
+  }
 });
 
 // Start polling
