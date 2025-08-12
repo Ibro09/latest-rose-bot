@@ -1,3 +1,4 @@
+const express = require('express');
 const { Telegraf, Markup } = require("telegraf");
 
 require("dotenv").config();
@@ -8,6 +9,16 @@ const askOpenRouter = require("./ai.js"); // adjust path as needed
 // Access env variables
 const bot = new Telegraf(process.env.BOT_TOKEN);
 let botUsername = "latestrosebot"; // without @;
+
+
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => res.send('Bot is alive'));
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+
+// Your Telegram bot code here...
 
 // Connect to MongoDB
 connectDB(process.env.MONGODB_URI);
