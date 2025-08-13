@@ -7,15 +7,9 @@ const User = require("./models/User");
 const Group = require("./models/Group"); // adjust path as needed
 const askOpenRouter = require("./testingai.js"); // adjust path as needed
 // Access env variables
-const bot = new Telegraf(process.env.BOT_TOKEN);
 let botUsername = "latestrosebot"; // without @;
 const botsFile = "./bots.json";
-let bots = fs.existsSync(botsFile) ? JSON.parse(fs.readFileSync(botsFile)) : [];
-const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("Bot is alive"));
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));
 
 // Your Telegram bot code here...
 
@@ -31,7 +25,7 @@ const newBotToken = new Map(); // userId -> true
 // ======================
 // START BOT
 // ======================
-bot.start(async (ctx) => {
+userBot.start(async (ctx) => {
   try {
     if (ctx.chat.type === "private") {
       const tgId = ctx.from.id;
@@ -56,7 +50,7 @@ bot.start(async (ctx) => {
             [
               Markup.button.url(
                 "➕ Add me to your chat!",
-                "https://t.me/latestrosebot?startgroup"
+                `https://t.me/${username}?startgroup`
               ),
             ],
           ]),
@@ -76,7 +70,7 @@ bot.start(async (ctx) => {
 // ======================
 // SET WLCOME MESSAGE
 // ======================
-bot.command("setwelcome", async (ctx) => {
+userBot.command("setwelcome", async (ctx) => {
   const chatId = ctx.chat.id;
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
     return ctx.reply("❌ This command is for groups only.");
@@ -93,7 +87,7 @@ bot.command("setwelcome", async (ctx) => {
 // ======================
 // SET TOGGLE WELCOME MESSAGE
 // ======================
-bot.command("togglewelcome", async (ctx) => {
+userBot.command("togglewelcome", async (ctx) => {
   const chatId = ctx.chat.id;
 
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
@@ -151,7 +145,7 @@ bot.command("togglewelcome", async (ctx) => {
 // ======================
 // REMOVE WELCOME MESSAGE
 // ======================
-bot.command("removewelcome", async (ctx) => {
+userBot.command("removewelcome", async (ctx) => {
   const chatId = ctx.chat.id;
 
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
@@ -195,7 +189,7 @@ bot.command("removewelcome", async (ctx) => {
 // ======================
 // BAN USER
 // ======================
-bot.command("ban", async (ctx) => {
+userBot.command("ban", async (ctx) => {
   if (
     !ctx.chat ||
     (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup")
@@ -232,7 +226,7 @@ bot.command("ban", async (ctx) => {
 // ======================
 // MUTE USER
 // ======================
-bot.command("mute", async (ctx) => {
+userBot.command("mute", async (ctx) => {
   if (
     !ctx.chat ||
     (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup")
@@ -282,7 +276,7 @@ bot.command("mute", async (ctx) => {
 // ======================
 // UNMUTE USER
 // ======================
-bot.command("unmute", async (ctx) => {
+userBot.command("unmute", async (ctx) => {
   if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
     return ctx.reply("🚫 The /unmute command can only be used in groups.");
   }
@@ -321,7 +315,7 @@ bot.command("unmute", async (ctx) => {
 // ======================
 // ADD FILTER
 // ======================
-bot.command("addfilter", async (ctx) => {
+userBot.command("addfilter", async (ctx) => {
   const chat = ctx.chat;
   const from = ctx.from;
 
@@ -360,7 +354,7 @@ bot.command("addfilter", async (ctx) => {
 // ======================
 // HELP
 // ======================
-bot.command("help", async (ctx) => {
+userBot.command("help", async (ctx) => {
   const helpMessage = `
 🤖 *Bot Commands*
 /start - Start interacting with the bot
@@ -388,7 +382,7 @@ bot.command("help", async (ctx) => {
 // ======================
 // REMOVE FILTER
 // ======================
-bot.command("removefilter", async (ctx) => {
+userBot.command("removefilter", async (ctx) => {
   const chat = ctx.chat;
   const from = ctx.from;
 
@@ -422,7 +416,7 @@ bot.command("removefilter", async (ctx) => {
 // ======================
 // LIST FILTER
 // ======================
-bot.command("listfilters", async (ctx) => {
+userBot.command("listfilters", async (ctx) => {
   const chat = ctx.chat;
 
   if (!["group", "supergroup"].includes(chat.type)) {
@@ -441,7 +435,7 @@ bot.command("listfilters", async (ctx) => {
 // ======================
 // SET GOODBYE MESSAGE
 // ======================
-bot.command("setgoodbye", async (ctx) => {
+userBot.command("setgoodbye", async (ctx) => {
   const chatId = ctx.chat.id;
 
   // Only allow in groups
@@ -463,7 +457,7 @@ bot.command("setgoodbye", async (ctx) => {
 // ======================
 // TOGGLE GOODBYE MESSAGE
 // ======================
-bot.command("togglegoodbye", async (ctx) => {
+userBot.command("togglegoodbye", async (ctx) => {
   const chatId = ctx.chat.id;
 
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
@@ -520,7 +514,7 @@ bot.command("togglegoodbye", async (ctx) => {
 // ======================
 // REMOVE GOODBYE MESSAGE
 // ======================
-bot.command("removegoodbye", async (ctx) => {
+userBot.command("removegoodbye", async (ctx) => {
   const chatId = ctx.chat.id;
 
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
@@ -559,13 +553,13 @@ bot.command("removegoodbye", async (ctx) => {
 
 let botId = null;
 
-bot.telegram.getMe().then((botInfo) => {
+userBot.telegram.getMe().then((botInfo) => {
   botId = botInfo.id;
   console.log("Bot ID:", botId);
 });
 // Cache bot info once
 (async () => {
-  const me = await bot.telegram.getMe();
+  const me = await userBot.telegram.getMe();
   botUsername = me.username;
   botId = me.id;
 })();
@@ -573,7 +567,7 @@ bot.telegram.getMe().then((botInfo) => {
 // ======================
 // SPAM PROTECTION TOGGLE
 // ======================
-bot.command("spam", async (ctx) => {
+userBot.command("spam", async (ctx) => {
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
     return ctx.reply("❌ This command can only be used in groups.");
   }
@@ -604,7 +598,7 @@ bot.command("spam", async (ctx) => {
 // ======================
 const verifyState = new Map(); // userId -> true
 
-bot.command("verify", async (ctx) => {
+userBot.command("verify", async (ctx) => {
   if (ctx.chat.type === "private") {
     verifyState.set(ctx.from.id, true);
     return ctx.reply("🔗 Please send your wallet address.");
@@ -616,7 +610,7 @@ bot.command("verify", async (ctx) => {
   }
 });
 
-bot.command("createBot", async (ctx) => {
+userBot.command("createBot", async (ctx) => {
   if (ctx.chat.type === "private") {
     newBotToken.set(ctx.from.id, true);
     return ctx.reply("🔗 Please send your Bot Token from Bot father.");
@@ -635,7 +629,7 @@ async function runWhenMentioned(ctx, msgId) {
 // ======================
 // USER THAT LEFT
 // ======================
-bot.on("left_chat_member", async (ctx) => {
+userBot.on("left_chat_member", async (ctx) => {
   const chatId = ctx.chat.id;
   const leftUser = ctx.message.left_chat_member;
   console.log(leftUser);
@@ -675,7 +669,7 @@ bot.on("left_chat_member", async (ctx) => {
 // ======================
 // NEW USER
 // ======================
-bot.on("new_chat_members", async (ctx) => {
+userBot.on("new_chat_members", async (ctx) => {
   const chatId = ctx.chat.id;
   const newMembers = ctx.message.new_chat_members;
 
@@ -722,7 +716,7 @@ bot.on("new_chat_members", async (ctx) => {
 // ======================
 // UPDATED CHAT MEMBER
 // ======================
-bot.on("my_chat_member", async (ctx) => {
+userBot.on("my_chat_member", async (ctx) => {
   const oldStatus = ctx.update.my_chat_member.old_chat_member.status;
   const newStatus = ctx.update.my_chat_member.new_chat_member.status;
   const chat = ctx.chat;
@@ -751,7 +745,7 @@ bot.on("my_chat_member", async (ctx) => {
       );
     } catch {
       console.warn(
-        "❌ Couldn't DM user – they probably haven't started the bot."
+        "❌ Couldn't DM user – they probably haven't started the userBot."
       );
     }
 
@@ -797,7 +791,7 @@ bot.on("my_chat_member", async (ctx) => {
 // ======================
 // MESSAGE
 // ======================
-bot.on("message", async (ctx) => {
+userBot.on("message", async (ctx) => {
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
 
@@ -829,7 +823,7 @@ bot.on("message", async (ctx) => {
     try {
       // Validate token by getting bot info
       const testBot = new Telegraf(token);
-      const me = await testBot.telegram.getMe();
+      const me = await testuserBot.telegram.getMe();
 
       // Save bot
       bots.push({
@@ -847,7 +841,7 @@ bot.on("message", async (ctx) => {
       startUserBot(token);
     } catch (err) {
       console.error(err);
-      ctx.reply("❌ Could not connect to bot. Check your token.");
+      ctx.reply("❌ Could not connect to userBot. Check your token.");
     }
   }
 
@@ -1142,38 +1136,3 @@ bot.on("message", async (ctx) => {
     }
   }
 });
-
-// Function to start user bots
-function startUserBot(token,username) {
-  const userBot = new Telegraf(token);
-let botUsername = username; // without @;
-
-  // userBot.start((ctx) =>
-  //   ctx.reply("Hello! I am your custom bot, powered by the Bot Maker. my name is " + botUsername)
-  // );
-
-
-   // Read the external JS file
-  const botLogic = fs.readFileSync("./createdBots.js", "utf8");
-
-  // Convert the string into a runnable function for the bot
-  eval(`
-      ${botLogic}
-  `);
-
-// console.log(botLogic);
-
-
-
-  userBot.launch();
-}
-
-
-bots.map((bot)=>{
-  startUserBot(bot.token,bot.username)
-})
-
-
-// Start polling
-bot.launch();
-console.log("Bot is running...");
