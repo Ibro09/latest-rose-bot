@@ -1,18 +1,70 @@
-const express = require("express");
-const { Telegraf, Markup } = require("telegraf");
-const fs = require("fs");
-require("dotenv").config();
-const connectDB = require("./db");
-const User = require("./models/User");
-const Group = require("./models/Group"); // adjust path as needed
-const askOpenRouter = require("./testingai.js"); // adjust path as needed
-// Access env variables
-let botUsername = "latestrosebot"; // without @;
+import { Telegraf, Markup } from "telegraf";
+import fs from "fs";
+import dotenv from "dotenv";
+import connectDB from "./db.js";
+import User from "./models/User.js";
+import Group from "./models/BotGroup.js"; // adjust path as needed
+// import askOpenRouter from "./testingai.js"; // adjust path as needed
 const botsFile = "./bots.json";
+import { GoogleGenAI } from "@google/genai";
+import BotModel from "./models/Bots.js";
+
+dotenv.config();
+ 
+// Load environment variables from .env
+const ai = new GoogleGenAI({
+  apiKey:process.env.Gemini_Token, // ⚠️ Don't hardcode in production
+});
+export default async function(userBot, botUsername, description,botId) {
 
 
-// Your Telegram bot code here...
+async function askOpenRouter(ctx, msg, msgId) {
+  try {
+     // Always fetch the latest bot info using botId
+    const botInfo = await BotModel.findOne({ botId: ctx.botInfo.id });
+    const botDescription = botInfo?.description || "";
 
+    const projectInfo = botDescription
+
+    // Use the message from Telegram instead of hardcoding
+    const question = msg ;
+
+    const prompt = `
+You are a moderator of a group to help assist with questions always replying with paragraphs not listing: And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
+${projectInfo}
+
+Based on the above, answer the following question:
+${question}
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents:prompt,
+    });
+
+    // console.log(response.text);
+   
+
+
+function escapeMarkdown(text) {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, "\\$1");
+}
+
+const safeText = escapeMarkdown(response.text);
+const cleaned = safeText.replace(/\*/g, " ");
+
+await ctx.reply(cleaned, {
+  parse_mode: "MarkdownV2", // safer than old Markdown
+  reply_to_message_id: msgId,
+});
+
+  } catch (error) {
+    console.error(error);
+    await ctx.reply(
+      "An error occurred while processing your request. Please try again later."
+    );
+  }
+}
 // Connect to MongoDB
 connectDB(process.env.MONGODB_URI);
 
@@ -20,7 +72,26 @@ const welcomeMessages = new Map(); // { chatId: welcomeText }
 const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
 const setWelcomeState = new Map(); // chatId -> userId
 const setGoodbyeState = new Map(); // chatId -> userId
-const newBotToken = new Map(); // userId -> true
+
+
+let Username = null;
+// Cache bot info once
+(async () => {
+  const me = await userBot.telegram.getMe();
+  Username = me.username;
+  botId = me.id;
+})();
+
+userBot.telegram.getMe().then((botInfo) => {
+  botId = botInfo.id;
+  console.log("Bot ID:", botId);
+});
+// Cache bot info once
+(async () => {
+  const me = await userBot.telegram.getMe();
+  botUsername = me.username;
+  botId = me.id;
+})();
 
 // ======================
 // START BOT
@@ -50,7 +121,7 @@ userBot.start(async (ctx) => {
             [
               Markup.button.url(
                 "➕ Add me to your chat!",
-                `https://t.me/${username}?startgroup`
+                `https://t.me/${Username}?startgroup`
               ),
             ],
           ]),
@@ -58,7 +129,7 @@ userBot.start(async (ctx) => {
       );
     } else {
       return ctx.reply(
-        "❗ Please start a private chat with me to use this command. DM me here: https://t.me/latestrosebot"
+        `❗ Please start a private chat with me to use this command. DM me here: https://t.me/${Username}`
       );
     }
   } catch (error) {
@@ -551,20 +622,10 @@ userBot.command("removegoodbye", async (ctx) => {
   }
 });
 
-let botId = null;
 
-userBot.telegram.getMe().then((botInfo) => {
-  botId = botInfo.id;
-  console.log("Bot ID:", botId);
-});
-// Cache bot info once
-(async () => {
-  const me = await userBot.telegram.getMe();
-  botUsername = me.username;
-  botId = me.id;
-})();
 
-// ======================
+
+// ======================  
 // SPAM PROTECTION TOGGLE
 // ======================
 userBot.command("spam", async (ctx) => {
@@ -610,19 +671,34 @@ userBot.command("verify", async (ctx) => {
   }
 });
 
-userBot.command("createBot", async (ctx) => {
+// /premium command
+userBot.command("premium", async (ctx) => {
   if (ctx.chat.type === "private") {
-    newBotToken.set(ctx.from.id, true);
-    return ctx.reply("🔗 Please send your Bot Token from Bot father.");
+    return ctx.reply("💎 Please pay for premium in the FomoWol main bot.");
   } else {
     return ctx.reply(
-      "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/latestrosebot)",
+      "👋 To upgrade to premium, please DM me and use /premium there.\n[Click here to DM](https://t.me/latestrosebot)",
       { parse_mode: "Markdown" }
     );
   }
 });
 
+
 async function runWhenMentioned(ctx, msgId) {
+    // Find the group in the database
+  const group = await Group.findOne({ groupId: ctx.chat.id });
+  if (!group) {
+    await ctx.reply("🚫 This group is not registered. AI feature is disabled.");
+    return;
+  }
+
+  // Find the creator in the database
+  const creator = await User.findOne({ userId: group.userId });
+  if (!creator || !creator.premium) {
+    await ctx.reply("🚫 The AI feature is only available in groups created by premium users.Please upgrade bot in the main fomowl bot");
+    return;
+  }
+
   askOpenRouter(ctx, ctx.message.text, msgId);
 }
 
@@ -673,6 +749,7 @@ userBot.on("new_chat_members", async (ctx) => {
   const chatId = ctx.chat.id;
   const newMembers = ctx.message.new_chat_members;
 
+  const chat = ctx.chat;
   console.log(
     "📥 New members joined:",
     newMembers.map((u) => ({
@@ -736,6 +813,23 @@ userBot.on("my_chat_member", async (ctx) => {
     console.log(
       `✅ Bot added to ${chat.title} by ${fullName} (@${username}) [${userId}]`
     );
+      // Count how many groups the bot is in
+    const groupCount = await Group.countDocuments({});
+    console.log(`Bot is now in ${groupCount} groups.`);
+    if (groupCount >= 6) {
+      // Leave the group
+      console.log(`❌ Bot cannot join more than 5 groups. Leaving ${chat.title} [${chat.id}]`);
+      try {
+        await ctx.telegram.sendMessage(
+          chat.id,
+          "🚫 Sorry, this bot can only be in 5 groups at a time. Please remove it from another group first."
+        );
+           await ctx.leaveChat();
+      } catch (err) {
+        console.log("❌ Failed to send group limit message:", err);
+      }
+      return;
+    }
 
     try {
       await ctx.telegram.sendMessage(
@@ -748,7 +842,7 @@ userBot.on("my_chat_member", async (ctx) => {
         "❌ Couldn't DM user – they probably haven't started the userBot."
       );
     }
-
+ 
     try {
       await ctx.telegram.sendMessage(
         chat.id,
@@ -810,40 +904,7 @@ userBot.on("message", async (ctx) => {
       parse_mode: "Markdown",
     });
     // Optionally, save to DB or notify admin here
-  } else if (
-    ctx.chat.type === "private" &&
-    newBotToken.get(ctx.from.id) &&
-    ctx.message.text &&
-    !ctx.message.text.startsWith("/")
-  ) {
-    const token = ctx.message.text.trim();
-    newBotToken.delete(ctx.from.id); // remove from "waiting" state
-    verifyState.delete(ctx.from.id);
-
-    try {
-      // Validate token by getting bot info
-      const testBot = new Telegraf(token);
-      const me = await testuserBot.telegram.getMe();
-
-      // Save bot
-      bots.push({
-        ownerId: ctx.from.id,
-        username: me.username,
-        token,
-      });
-      fs.writeFileSync(botsFile, JSON.stringify(bots, null, 2));
-
-      ctx.reply(
-        `✅ Bot created successfully!\nName: ${me.first_name}\nUsername: @${me.username}`
-      );
-
-      // Start the bot immediately
-      startUserBot(token);
-    } catch (err) {
-      console.error(err);
-      ctx.reply("❌ Could not connect to userBot. Check your token.");
-    }
-  }
+  } 
 
   // Handle welcome message setup (text or photo)
   if (setWelcomeState.get(chatId) === userId) {
@@ -1135,4 +1196,10 @@ userBot.on("message", async (ctx) => {
       console.log("Spam check error:", err);
     }
   }
+    if (ctx.message.migrate_to_chat_id) {
+      const oldId = ctx.message.chat.id;  // old group ID
+      const newId = ctx.message.migrate_to_chat_id; // new supergroup ID
+      await Group.updateOne({ groupId: oldId.toString() }, { groupId: newId.toString() });
+    }
 });
+}

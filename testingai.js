@@ -1,7 +1,6 @@
-const fs = require("fs");
-const { GoogleGenAI } = require("@google/genai");
-const dotenv = require("dotenv");
-
+import fs from "fs";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
 // Load environment variables from .env
 dotenv.config();
 const ai = new GoogleGenAI({
@@ -16,7 +15,7 @@ async function askOpenRouter(ctx, msg, msgId) {
     const question = msg ;
 
     const prompt = `
-You are amoderator of a group to help assist with questions:And sound genz
+You are a chatbot not only in telegram (so dont use telegram syntax) and never use * in a response :And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
 ${projectInfo}
 
 Based on the above, answer the following question:
@@ -37,8 +36,9 @@ function escapeMarkdown(text) {
 }
 
 const safeText = escapeMarkdown(response.text);
+const cleaned = safeText.replace(/\*/g, " ");
 
-await ctx.reply(safeText, {
+await ctx.reply(cleaned, {
   parse_mode: "MarkdownV2", // safer than old Markdown
   reply_to_message_id: msgId,
 });
@@ -51,4 +51,6 @@ await ctx.reply(safeText, {
   }
 }
 
-module.exports = askOpenRouter;
+// module.exports = askOpenRouter;
+export default askOpenRouter;
+

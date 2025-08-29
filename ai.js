@@ -1,7 +1,10 @@
 // askOpenRouter.js
-// const fetch = require('node-fetch'); // Uncomment this if you're on Node < v18
-const fs = require("fs");
-require("dotenv").config();
+// import fetch from 'node-fetch'; // Uncomment this if you're on Node < v18
+import fs from "fs";
+import dotenv from "dotenv";
+
+dotenv.config();
+// ...existing code...
 
 const OPENROUTER_API_KEY = process.env.Ai_Token; // Replace this
 const YOUR_SITE_URL = "https://your-site-url.com"; // Optional
@@ -56,4 +59,6 @@ NOTE: do not use hashtags in the response  and dont reply like a bot, be human-l
   }
 }
 
-module.exports = askOpenRouter;
+// module.exports = askOpenRouter;
+
+export default askOpenRouter;

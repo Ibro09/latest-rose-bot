@@ -1,7 +1,8 @@
 // models/User.js
 import mongoose from "mongoose";
+
 const groupSchema = new mongoose.Schema({
-  groupId: { type: String, required: true, unique: true },
+  groupId: { type: Number, required: true, unique: true },
   userId: { type: Number, required: true },
   bannedWords: { type: [String], default: [] },
   isWelcome: { type: Boolean, default: false },
@@ -15,8 +16,8 @@ const groupSchema = new mongoose.Schema({
 goodbyePhotoId: { type: String, default: null },
 });
 
-// module.exports = mongoose.model("LatestRoseBotGroup", groupSchema);
+// module.exports = mongoose.model("BotGroups", groupSchema);
 
-export default mongoose.model("LatestRoseBotGroup", groupSchema);
+export default mongoose.model("BotGroups", groupSchema);
 
   

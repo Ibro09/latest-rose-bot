@@ -1,16 +1,21 @@
-const express = require("express");
-const { Telegraf, Markup } = require("telegraf");
-const fs = require("fs");
-require("dotenv").config();
-const connectDB = require("./db");
-const User = require("./models/User");
-const Group = require("./models/Group"); // adjust path as needed
-const askOpenRouter = require("./testingai.js"); // adjust path as needed
-// Access env variables
-const bot = new Telegraf(process.env.BOT_TOKEN);
-let botUsername = "latestrosebot"; // without @;
+import express from "express";
+import { Telegraf, Markup } from "telegraf";
+import fs from "fs";
+import dotenv from "dotenv";
+import User from "./models/User.js";
+import Group from "./models/Group.js";
+import askOpenRouter from "./testingai.js";
+import path from "path";
+import axios from "axios";
+import BotModel from "./models/Bots.js";
+import connectDB from "./models/PremiumDb.js"; // adjust path if needed
+import Premium from "./models/Premium.js"; // adjust path if needed
+import { ethers } from "ethers";
+
+dotenv.config();
 const botsFile = "./bots.json";
 let bots = fs.existsSync(botsFile) ? JSON.parse(fs.readFileSync(botsFile)) : [];
+const bot = new Telegraf(process.env.BOT_TOKEN);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -36,11 +41,12 @@ bot.start(async (ctx) => {
     if (ctx.chat.type === "private") {
       const tgId = ctx.from.id;
       const name = ctx.from.first_name || "there";
+      const username = ctx.from.username;
 
       // ✅ Save user to database if not already present
       const existingUser = await User.findOne({ userId: tgId });
       if (!existingUser) {
-        await new User({ userId: tgId }).save();
+        await new User({ userId: tgId, username }).save();
         console.log(`🆕 New user saved: ${tgId}`);
       } else {
         console.log(`👤 Returning user: ${tgId}`);
@@ -64,7 +70,7 @@ bot.start(async (ctx) => {
       );
     } else {
       return ctx.reply(
-        "❗ Please start a private chat with me to use this command. DM me here: https://t.me/latestrosebot"
+        `❗ Please start a private chat with me to use this command. DM me here: https://t.me/${ctx.botInfo.username}`
       );
     }
   } catch (error) {
@@ -563,6 +569,8 @@ bot.telegram.getMe().then((botInfo) => {
   botId = botInfo.id;
   console.log("Bot ID:", botId);
 });
+
+let botUsername = null;
 // Cache bot info once
 (async () => {
   const me = await bot.telegram.getMe();
@@ -616,16 +624,312 @@ bot.command("verify", async (ctx) => {
   }
 });
 
-bot.command("createBot", async (ctx) => {
+// ======================
+// CREATE NEW BOT COMMAND
+// ======================
+bot.command("createbot", async (ctx) => {
   if (ctx.chat.type === "private") {
     newBotToken.set(ctx.from.id, true);
-    return ctx.reply("🔗 Please send your Bot Token from Bot father.");
+     const botCount = await BotModel.countDocuments({ ownerId: ctx.from.id });
+    console.log(`User ${ctx.from.id} has created ${botCount} bots.`);
+    if (botCount >= 1) {
+      return ctx.reply(
+        "❌ You have reached the limit of bots. Please delete an existing bot before creating a new one."
+      );
+    }
+    return ctx.reply(
+      "🤖 To continue, please provide your Bot Token.\n\n" +
+        "🔗 You can get this token from @BotFather:\n" +
+        "1️⃣ Open the @BotFather chat on Telegram.\n" +
+        "2️⃣ Use the command /newbot to create a new bot (or /mybots to manage an existing one).\n" +
+        "3️⃣ After setup, BotFather will give you a token that looks like this:\n\n" +
+        "`1234567890:ABC-123xyzExampleToken`\n\n" +
+        "📩 Now, please copy that token and send it here."
+    );
   } else {
     return ctx.reply(
       "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/latestrosebot)",
       { parse_mode: "Markdown" }
     );
   }
+});
+
+// ======================
+// LIST BOTS COMMAND
+// ======================
+
+// Function to get bots for a user
+async function getUserBots(userId) {
+  return await BotModel.find({ ownerId: userId });
+}
+
+// Function to send bot list with buttons
+async function sendBotList(ctx, commandType) {
+  const userId = ctx.from.id;
+  const userBots = await getUserBots(userId);
+
+  if (userBots.length === 0) {
+    return ctx.reply("ℹ️ You have no bots created yet.");
+  }
+
+  const buttons = userBots.map((b) => [
+    Markup.button.callback(`@${b.username}`, `${commandType}:${b.username}`),
+  ]);
+
+  await ctx.reply("📃 Your bots:", Markup.inlineKeyboard(buttons));
+}
+// /listbots
+bot.command("listbots", async (ctx) => {
+  if (ctx.chat.type === "private") {
+    await sendBotList(ctx, "list");
+  }
+});
+
+// /editbots
+bot.command("editbots", async (ctx) => {
+  if (ctx.chat.type === "private") {
+    await sendBotList(ctx, "edit");
+  }
+});
+
+bot.action(/^edit:(.+)$/, async (ctx) => {
+  const username = ctx.match[1];
+  const userId = ctx.from.id;
+
+  const botInfo = await BotModel.findOne({
+    username: username,
+    ownerId: userId,
+  });
+
+  if (!botInfo) {
+    return ctx.answerCbQuery("❌ Bot not found or not yours.");
+  }
+
+  // Get @username from Telegram if possible
+  let ownerUsername = "🚫";
+  try {
+    const user = await ctx.telegram.getChat(botInfo.ownerId);
+    if (user && user.username) {
+      ownerUsername = `@${user.username}`;
+    }
+  } catch (err) {
+    console.error("Error fetching owner username:", err.message);
+  }
+
+  // Fetch bot name from its ID
+  let botName = "🚫";
+  try {
+    const botChat = await ctx.telegram.getChat(botId);
+    if (botChat) {
+      botName = botChat.first_name || botChat.username || "🚫";
+    }
+  } catch (err) {
+    console.error("Error fetching bot name:", err.message);
+  }
+
+  // Prepare the bot info text
+  const infoMessage =
+    `Edit @${botInfo.username} info.\n\n` +
+    `Name: ${botName || "🚫"}\n` +
+    `UserName: @${botInfo.username || "🚫"}\n` +
+    `Owner: ${ownerUsername || "🚫"}\n` +
+    `Description: ${botInfo.description || "🚫"}\n`;
+
+  // Create the inline keyboard
+  const buttons = [
+    [Markup.button.callback("Edit Description", `editDescription:${username}`)],
+    [Markup.button.callback("« Back to Bots", `editbots`)],
+  ];
+
+  await ctx.editMessageText(infoMessage, {
+    reply_markup: { inline_keyboard: buttons },
+  });
+
+  await ctx.answerCbQuery();
+});
+
+// Add this handler for the "Back to Bots" button
+bot.action("editbots", async (ctx) => {
+  const userId = ctx.from.id;
+  const userBots = await getUserBots(userId);
+
+  if (userBots.length === 0) {
+    await ctx.editMessageText("ℹ️ You have no bots created yet.");
+    return ctx.answerCbQuery();
+  }
+
+  const buttons = userBots.map((b) => [
+    Markup.button.callback(`@${b.username}`, `edit:${b.username}`),
+  ]);
+
+  await ctx.editMessageText("📃 Your bots:", {
+    reply_markup: { inline_keyboard: buttons },
+  });
+  await ctx.answerCbQuery();
+});
+
+// Handle button clicks for both list and edit
+bot.action(/^(list|edit):(.+)$/, async (ctx) => {
+  const actionType = ctx.match[1]; // "list" or "edit"
+  const username = ctx.match[2];
+  const userId = ctx.from.id;
+
+  const botInfo = await BotModel.findOne({
+    username: username,
+    ownerId: userId,
+  });
+
+  if (!botInfo) {
+    return ctx.answerCbQuery("❌ Bot not found or not yours.");
+  }
+
+  let message = `🤖 Bot: @${botInfo.username}\n📜 Description: ${
+    botInfo.description || "No description"
+  }`;
+  if (actionType === "edit") {
+    message += "\n✏️ You can edit this bot's details.";
+  }
+
+  await ctx.answerCbQuery();
+  await ctx.reply(message);
+});
+
+// Track users editing bot descriptions
+const editDescriptionState = new Map(); // userId -> botUsername
+
+// Handle "Edit Description" button
+bot.action(/^editDescription:(.+)$/, async (ctx) => {
+  const username = ctx.match[1];
+  const userId = ctx.from.id;
+
+  // Set state
+  editDescriptionState.set(userId, username);
+
+  await ctx.editMessageText(
+    "✏️ Please send the new description as a message or upload a .txt file.",
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [Markup.button.callback("« Back to Bots", "editbots")],
+        ],
+      },
+    }
+  );
+  await ctx.answerCbQuery();
+});
+
+// Example plans object (can be dynamic from DB later)
+
+
+// Helper to get premium data
+async function getPremiumData() {
+  const premiums = await Premium.find();
+  return premiums[0]; // assuming only one document
+}
+
+// /premium command
+bot.command("premium", async (ctx) => {
+  const premium = await getPremiumData();
+  const keyboard = premium.tokens.map((token) => [
+    Markup.button.callback(token.name, `pay_${token.name.toLowerCase()}`),
+  ]);
+
+  ctx.reply("Choose a payment option:", Markup.inlineKeyboard(keyboard));
+});
+
+// Handle token selection
+bot.action(/pay_(.+)/, async (ctx) => {
+  const premium = await getPremiumData();
+  const method = ctx.match[1].toUpperCase();
+  const token = premium.tokens.find((t) => t.name.toUpperCase() === method);
+
+  if (!token) {
+    return ctx.answerCbQuery("Token not found");
+  }
+
+  ctx.editMessageText(
+    `Payment Method: ${method}\nChoose a plan:`,
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback(
+          `Monthly - ${token.monthlySubscription}`,
+          `plan_${method}_monthly`
+        ),
+      ],
+      [
+        Markup.button.callback(
+          `Yearly - ${token.yearlySubscription}`,
+          `plan_${method}_yearly`
+        ),
+      ],
+      [
+        Markup.button.callback(
+          `One-Time - ${token.oneTimeSubscription}`,
+          `plan_${method}_one`
+        ),
+      ],
+    ])
+  );
+});
+
+const paymentState = new Map(); // userId -> { method, type }
+
+bot.action(/plan_(.+)_(.+)/, async (ctx) => {
+  const [method, type] = ctx.match.slice(1);
+  const premium = await getPremiumData();
+  const token = premium.tokens.find(
+    (t) => t.name.toUpperCase() === method.toUpperCase()
+  );
+  if (!token) return ctx.answerCbQuery("Token not found");
+
+  let price;
+  switch (type) {
+    case "monthly":
+      price = token.monthlySubscription;
+      break;
+    case "yearly":
+      price = token.yearlySubscription;
+      break;
+    case "one":
+      price = token.oneTimeSubscription;
+      break;
+    default:
+      price = "N/A";
+  }
+
+  const address = premium.address;
+  ctx.answerCbQuery();
+  ctx.reply(
+    `You selected *${type.toUpperCase()}* plan using *${method.toUpperCase()}*.\nPrice: *${price}*\n\nSend payment to:\n\`\`\`${address}\`\`\``,
+    {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "I have made payment",
+              callback_data: `confirm_payment_${method}_${type}`,
+            },
+          ],
+        ],
+      },
+    }
+  );
+});
+
+bot.action(/confirm_payment_(.+)_(.+)/, (ctx) => {
+  const [method, type] = ctx.match.slice(1);
+  paymentState.set(ctx.from.id, { method, type });
+  ctx.answerCbQuery();
+  ctx.reply("Please send your transaction hash:");
+});
+
+bot.command("aaa", async (ctx) => {
+  await connectDB();
+
+  const premiums = await Premium.find();
+  console.log(premiums[0].tokens[0].name);
+  await ctx.reply(premiums[0]);
 });
 
 async function runWhenMentioned(ctx, msgId) {
@@ -742,7 +1046,22 @@ bot.on("my_chat_member", async (ctx) => {
     console.log(
       `✅ Bot added to ${chat.title} by ${fullName} (@${username}) [${userId}]`
     );
-
+      const groupCount = await Group.countDocuments({});
+      console.log(`Bot is now in ${groupCount} groups.`);
+      if (groupCount >= 6) {
+        // Leave the group
+        console.log(`❌ Bot cannot join more than 5 groups. Leaving ${chat.title} [${chat.id}]`);
+        try {
+          await ctx.telegram.sendMessage(
+            chat.id,
+            "🚫 Sorry, this bot can only be in 5 groups at a time. Please remove it from another group first."
+          );
+             await ctx.leaveChat();
+        } catch (err) {
+          console.log("❌ Failed to send group limit message:", err);
+        }
+        return;
+      }
     try {
       await ctx.telegram.sendMessage(
         userId,
@@ -793,6 +1112,35 @@ bot.on("my_chat_member", async (ctx) => {
   }
 });
 
+// Listen for documents
+bot.on("document", async (ctx) => {
+  console.log("📄 Document received:", ctx.message.document);
+
+  try {
+    const fileId = ctx.message.document.file_id;
+
+    // Get file path from Telegram
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+
+    // Download file content
+    const response = await axios.get(fileLink.href, {
+      responseType: "arraybuffer",
+    });
+
+    // Convert to text (assuming UTF-8 encoding)
+    const fileText = response.data.toString("utf8");
+
+    // Send back the text
+    await ctx.reply("📄 File Content:\n\n" + fileText);
+
+    // Optional: save to disk
+    fs.writeFileSync("uploaded_code.js", fileText, "utf8");
+    console.log("File saved as uploaded_code.js");
+  } catch (err) {
+    console.error(err);
+    ctx.reply("❌ Failed to read file.");
+  }
+});
 
 // ======================
 // MESSAGE
@@ -800,7 +1148,39 @@ bot.on("my_chat_member", async (ctx) => {
 bot.on("message", async (ctx) => {
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
+  const username = editDescriptionState.get(userId);
 
+  // Only proceed if user is in edit mode
+  if (username) {
+    let newDescription = null;
+
+    // If user sent a .txt file
+    if (
+      ctx.message.document &&
+      ctx.message.document.mime_type === "text/plain"
+    ) {
+      const fileId = ctx.message.document.file_id;
+      const fileLink = await ctx.telegram.getFileLink(fileId);
+      const response = await axios.get(fileLink.href);
+      newDescription = response.data.toString("utf8");
+    }
+    // If user sent text
+    else if (ctx.message.text) {
+      newDescription = ctx.message.text;
+    }
+
+    if (newDescription !== null) {
+      await BotModel.findOneAndUpdate(
+        { username, ownerId: userId },
+        { $set: { description: newDescription } }
+      );
+      editDescriptionState.delete(userId);
+      await ctx.reply("✅ Description updated!");
+    } else {
+      await ctx.reply("❌ Please send a text message or a .txt file.");
+    }
+    return;
+  }
   if (
     ctx.chat.type === "private" &&
     verifyState.get(ctx.from.id) &&
@@ -831,25 +1211,103 @@ bot.on("message", async (ctx) => {
       const testBot = new Telegraf(token);
       const me = await testBot.telegram.getMe();
 
-      // Save bot
-      bots.push({
+      // Save bot to MongoDB, including botId
+      await BotModel.create({
         ownerId: ctx.from.id,
         username: me.username,
         token,
+        botId: me.id, // <-- Save botId here
       });
-      fs.writeFileSync(botsFile, JSON.stringify(bots, null, 2));
 
       ctx.reply(
         `✅ Bot created successfully!\nName: ${me.first_name}\nUsername: @${me.username}`
       );
 
       // Start the bot immediately
-      startUserBot(token);
+      startUserBot(token, me.username, "", me.id); // Pass botId to startUserBot
     } catch (err) {
       console.error(err);
       ctx.reply("❌ Could not connect to bot. Check your token.");
     }
+  } // ===== TRANSACTION HASH HANDLER =====
+if (
+  ctx.chat.type === "private" &&
+  paymentState.has(userId) &&
+  ctx.message.text &&
+  !ctx.message.text.startsWith("/")
+) {
+  const { method, type } = paymentState.get(userId);
+  const txHash = ctx.message.text.trim();
+  paymentState.delete(userId);
+
+  await ctx.reply(
+    `✅ Transaction hash received for *${type.toUpperCase()}* using *${method.toUpperCase()}*:\n\`${txHash}\`\nVerifying payment...`,
+    { parse_mode: "Markdown" }
+  );
+
+  try {
+    const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+    const ERC20_ABI = [
+      "event Transfer(address indexed from, address indexed to, uint256 value)",
+    ];
+
+    // Fetch your premium document
+    const premium = await getPremiumData();
+
+    // Find the token matching the payment method
+    const token = premium.tokens.find(
+      (t) => t.name.toUpperCase() === method.toUpperCase()
+    );
+
+    if (!token) {
+      return ctx.reply("❌ Token not found in premium data.");
+    }
+
+    const tokenAddress = token.mint;       // Use the token's mint address
+    const receiver = premium.address;      // Your receiving wallet
+
+    async function getTokenTxAmount(txHash, tokenAddress, receiver) {
+      const iface = new ethers.Interface(ERC20_ABI);
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (!receipt) return { success: false, message: "Transaction not found" };
+
+      for (let log of receipt.logs) {
+        if (log.address.toLowerCase() === tokenAddress.toLowerCase()) {
+          try {
+            const parsed = iface.parseLog(log);
+            if (parsed.args.to.toLowerCase() === receiver.toLowerCase()) {
+              return {
+                success: true,
+                from: parsed.args.from,
+                to: parsed.args.to,
+                amount: parsed.args.value.toString(), // raw token units
+              };
+            }
+          } catch {}
+        }
+      }
+      return { success: false, message: "No matching transfer found" };
+    }
+
+    const result = await getTokenTxAmount(txHash, tokenAddress, receiver);
+
+    if (result.success) {
+      await ctx.reply(
+        `✅ *Transfer Verified!*\n\n` +
+          `👤 *From:* ${result.from}\n` +
+          `📥 *To:* ${result.to}\n` +
+          `💰 *Amount:* ${result.amount}`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await ctx.reply(`❌ Could not verify payment: ${result.message}`);
+    }
+  } catch (error) {
+    console.error(error);
+    return ctx.reply("❌ Error processing transaction.");
   }
+}
+
 
   // Handle welcome message setup (text or photo)
   if (setWelcomeState.get(chatId) === userId) {
@@ -1141,38 +1599,32 @@ bot.on("message", async (ctx) => {
       console.log("Spam check error:", err);
     }
   }
+
+  if (ctx.message.migrate_to_chat_id) {
+    const oldId = ctx.message.chat.id;  // old group ID
+    const newId = ctx.message.migrate_to_chat_id; // new supergroup ID
+    await Group.updateOne({ groupId: oldId.toString() }, { groupId: newId.toString() });
+  }
+
 });
 
 // Function to start user bots
-function startUserBot(token,username) {
+async function startUserBot(token, username, description, botId) {
+  const { default: botLogic } = await import("./createdBots.js");
   const userBot = new Telegraf(token);
-let botUsername = username; // without @;
-
-  // userBot.start((ctx) =>
-  //   ctx.reply("Hello! I am your custom bot, powered by the Bot Maker. my name is " + botUsername)
-  // );
-
-
-   // Read the external JS file
-  const botLogic = fs.readFileSync("./createdBots.js", "utf8");
-
-  // Convert the string into a runnable function for the bot
-  eval(`
-      ${botLogic}
-  `);
-
-// console.log(botLogic);
-
-
-
+  botLogic(userBot, username, description, botId); // Pass botId to createdBots.js
   userBot.launch();
 }
 
+// Function to start user bots
+async function startAllUserBots() {
+  const allBots = await BotModel.find({});
+  allBots.forEach((bot) => {
+    startUserBot(bot.token, bot.username, bot.description, bot.botId); // Pass botId
+  });
+}
 
-bots.map((bot)=>{
-  startUserBot(bot.token,bot.username)
-})
-
+startAllUserBots();
 
 // Start polling
 bot.launch();
