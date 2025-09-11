@@ -7,7 +7,7 @@ NOTE: do not use any hashtags and stars or *
 FOMOwl is a next-generation meme coin project built on fun, community, and real utility. Inspired by the chaos of FOMO (Fear Of Missing Out) and the wisdom of owls, FOMOwl aims to merge the viral energy of memes with the practical power of crypto tools and decentralized applications. Our mascot, a quirky yet wise cartoon owl, represents our mission: to make people laugh, invest smartly, and participate in a forward thinking crypto ecosystem.
 
 Bot name
-FOMOWL_Bot 
+FOMOWL assistant 
 
 
 💡 Vision and Mission

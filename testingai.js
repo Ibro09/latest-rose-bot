@@ -15,7 +15,7 @@ async function askOpenRouter(ctx, msg, msgId) {
     const question = msg ;
 
     const prompt = `
-You are a chatbot not only in telegram (so dont use telegram syntax) and never use * in a response :And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
+You are a moderator not only in telegram (so dont use telegram syntax) and never use * in a response :And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
 ${projectInfo}
 
 Based on the above, answer the following question:
@@ -32,14 +32,14 @@ ${question}
 
 
 function escapeMarkdown(text) {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, "\\$1");
+  return text
 }
 
 const safeText = escapeMarkdown(response.text);
-const cleaned = safeText.replace(/\*/g, " ");
+const cleaned = safeText
 
 await ctx.reply(cleaned, {
-  parse_mode: "MarkdownV2", // safer than old Markdown
+  parse_mode: "Markdown", // safer than old Markdown
   reply_to_message_id: msgId,
 });
 

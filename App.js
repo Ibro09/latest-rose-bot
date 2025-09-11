@@ -4,6 +4,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import User from "./models/User.js";
 import Group from "./models/Group.js";
+import Wallet from "./models/Wallet.js";
 import askOpenRouter from "./testingai.js";
 import path from "path";
 import axios from "axios";
@@ -11,6 +12,7 @@ import BotModel from "./models/Bots.js";
 import connectDB from "./models/PremiumDb.js"; // adjust path if needed
 import Premium from "./models/Premium.js"; // adjust path if needed
 import { ethers } from "ethers";
+import Fomowl from "./models/Fomowl.js";
 
 dotenv.config();
 const botsFile = "./bots.json";
@@ -32,7 +34,8 @@ const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
 const setWelcomeState = new Map(); // chatId -> userId
 const setGoodbyeState = new Map(); // chatId -> userId
 const newBotToken = new Map(); // userId -> true
-
+const paymentWallets = new Map(); // userId -> walletAddress
+const paymentWalletsPrivateKeys = new Map(); // userId -> privateKey
 // ======================
 // START BOT
 // ======================
@@ -368,25 +371,25 @@ bot.command("addfilter", async (ctx) => {
 // ======================
 bot.command("help", async (ctx) => {
   const helpMessage = `
-🤖 *Bot Commands*
-/start - Start interacting with the bot
-/help - Show this help menu
-/setwelcome - Set welcome message
-/togglewelcome - Enable/disable welcome message
-/removewelcome - Remove welcome message
-/setgoodbye - Set goodbye message
-/togglegoodbye - Enable/disable goodbye message
-/removegoodbye - Remove goodbye message
-/ban - 🚫 Ban a user (reply to user)
-/mute - 🔇 Mute a user (reply to user)
-/unmute - 🔊 Unmute a user (reply to user)
-/addfilter - ➕ Add a banned word
-/removefilter - ➖ Remove a banned word
-/listfilters - 📃 List banned words
-/spam - 🛡️ Enable/disable spam protection
+                          🤖 *Bot Commands*
+                          /start - Start interacting with the bot
+                          /help - Show this help menu
+                          /setwelcome - Set welcome message
+                          /togglewelcome - Enable/disable welcome message
+                          /removewelcome - Remove welcome message
+                          /setgoodbye - Set goodbye message
+                          /togglegoodbye - Enable/disable goodbye message
+                          /removegoodbye - Remove goodbye message
+                          /ban - 🚫 Ban a user (reply to user)
+                          /mute - 🔇 Mute a user (reply to user)
+                          /unmute - 🔊 Unmute a user (reply to user)
+                          /addfilter - ➕ Add a banned word
+                          /removefilter - ➖ Remove a banned word
+                          /listfilters - 📃 List banned words
+                          /spam - 🛡️ Enable/disable spam protection
 
-💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
-`;
+                          💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
+                          `;
 
   ctx.reply(helpMessage, { parse_mode: "Markdown" });
 });
@@ -606,12 +609,29 @@ bot.command("spam", async (ctx) => {
     } in this group.`
   );
 });
+const verifyState = new Map(); // userId -> true
 
 // ======================
 // VERIFY COMMAND
 // ======================
-const verifyState = new Map(); // userId -> true
+// Global map to track verify states per user
+const verifySetupMap = new Map();
 
+const BOT_OWNER_IDS = [123456789, 987654321, 5821395927]; // replace with Telegram user IDs of owners
+
+bot.command("setverify", async (ctx) => {
+  if (!BOT_OWNER_IDS.includes(ctx.from.id)) {
+    return ctx.reply("⚠️ You are not an owner of this bot.");
+  }
+
+  // ✅ Owner verified
+  verifySetupMap.set(ctx.from.id, { stage: "awaitingInput" });
+  ctx.reply(
+    "✍️ Send settings in format: <tokenAddress> <minAmount> <groupLink>"
+  );
+});
+
+// USER: start verify
 bot.command("verify", async (ctx) => {
   if (ctx.chat.type === "private") {
     verifyState.set(ctx.from.id, true);
@@ -623,14 +643,13 @@ bot.command("verify", async (ctx) => {
     );
   }
 });
-
 // ======================
 // CREATE NEW BOT COMMAND
 // ======================
 bot.command("createbot", async (ctx) => {
   if (ctx.chat.type === "private") {
     newBotToken.set(ctx.from.id, true);
-     const botCount = await BotModel.countDocuments({ ownerId: ctx.from.id });
+    const botCount = await BotModel.countDocuments({ ownerId: ctx.from.id });
     console.log(`User ${ctx.from.id} has created ${botCount} bots.`);
     if (botCount >= 1) {
       return ctx.reply(
@@ -818,23 +837,71 @@ bot.action(/^editDescription:(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
 });
 
-// Example plans object (can be dynamic from DB later)
-
-
 // Helper to get premium data
 async function getPremiumData() {
   const premiums = await Premium.find();
   return premiums[0]; // assuming only one document
 }
 
-// /premium command
-bot.command("premium", async (ctx) => {
-  const premium = await getPremiumData();
-  const keyboard = premium.tokens.map((token) => [
-    Markup.button.callback(token.name, `pay_${token.name.toLowerCase()}`),
-  ]);
+async function getOrCreateWallet(userId) {
+  // ✅ Check if wallet exists
+  let userWallet = await Wallet.findOne({ userId });
+  if (userWallet) return userWallet;
 
-  ctx.reply("Choose a payment option:", Markup.inlineKeyboard(keyboard));
+  // ✅ If not, create new
+  const wallet = ethers.Wallet.createRandom();
+
+  // Ensure private key always has 0x prefix
+  const privateKey = wallet.privateKey.startsWith("0x")
+    ? wallet.privateKey
+    : "0x" + wallet.privateKey;
+
+  userWallet = new Wallet({
+    userId,
+    address: wallet.address,
+    privateKey,
+  });
+
+  await userWallet.save();
+  return userWallet;
+}
+
+bot.command("premium", async (ctx) => {
+  try {
+    const userId = ctx.from.id;
+
+    // Fetch user data
+    let user = await User.findOne({ userId });
+
+    if (!user) {
+      // Create user record if not exists
+      user = await User.create({
+        userId,
+        username: ctx.from.username || ctx.from.first_name,
+      });
+    }
+
+    // Check if user is already premium
+    if (user.premium && user.premiumUntil && user.premiumUntil > new Date()) {
+      return ctx.reply(
+        `🌟 You already have Premium access until ${user.premiumUntil.toDateString()}`
+      );
+    }
+
+    // Otherwise show payment options
+    const premium = await getPremiumData();
+    const keyboard = premium.tokens.map((token) => [
+      Markup.button.callback(token.name, `pay_${token.name.toLowerCase()}`),
+    ]);
+
+    return ctx.reply(
+      "💎 Choose a payment option:\n\n⚠️ NOTE: All payments are in BASE blockchain.",
+      Markup.inlineKeyboard(keyboard)
+    );
+  } catch (err) {
+    console.error("Premium command error:", err);
+    return ctx.reply("⚠️ Failed to load premium options. Try again later.");
+  }
 });
 
 // Handle token selection
@@ -845,6 +912,20 @@ bot.action(/pay_(.+)/, async (ctx) => {
 
   if (!token) {
     return ctx.answerCbQuery("Token not found");
+  }
+
+  // Calculate discount if yearly is cheaper
+  let discountText = "";
+  if (token.monthlySubscription && token.yearlySubscription) {
+    const monthlyCostYearly = token.yearlySubscription / 12;
+    const discount =
+      ((token.monthlySubscription - monthlyCostYearly) /
+        token.monthlySubscription) *
+      100;
+
+    if (discount > 0) {
+      discountText = ` (${discount.toFixed(1)}% off)`;
+    }
   }
 
   ctx.editMessageText(
@@ -858,7 +939,7 @@ bot.action(/pay_(.+)/, async (ctx) => {
       ],
       [
         Markup.button.callback(
-          `Yearly - ${token.yearlySubscription}`,
+          `Yearly - ${token.yearlySubscription}${discountText}`,
           `plan_${method}_yearly`
         ),
       ],
@@ -874,6 +955,7 @@ bot.action(/pay_(.+)/, async (ctx) => {
 
 const paymentState = new Map(); // userId -> { method, type }
 
+// === PLAN SELECTION ===
 bot.action(/plan_(.+)_(.+)/, async (ctx) => {
   const [method, type] = ctx.match.slice(1);
   const premium = await getPremiumData();
@@ -881,6 +963,18 @@ bot.action(/plan_(.+)_(.+)/, async (ctx) => {
     (t) => t.name.toUpperCase() === method.toUpperCase()
   );
   if (!token) return ctx.answerCbQuery("Token not found");
+
+  // ✅ Get wallet from DB (create if not exists)
+  const userWallet = await getOrCreateWallet(ctx.from.id);
+
+  // ✅ Ensure private key always has 0x prefix
+  let privateKey = userWallet.privateKey;
+  if (!privateKey.startsWith("0x")) {
+    privateKey = "0x" + privateKey;
+  }
+
+  paymentWallets.set(ctx.from.id, userWallet.address);
+  paymentWalletsPrivateKeys.set(ctx.from.id, privateKey);
 
   let price;
   switch (type) {
@@ -897,10 +991,13 @@ bot.action(/plan_(.+)_(.+)/, async (ctx) => {
       price = "N/A";
   }
 
-  const address = premium.address;
   ctx.answerCbQuery();
   ctx.reply(
-    `You selected *${type.toUpperCase()}* plan using *${method.toUpperCase()}*.\nPrice: *${price}*\n\nSend payment to:\n\`\`\`${address}\`\`\``,
+    `You selected *${type.toUpperCase()}* plan using *${method.toUpperCase()}*.\nPrice: *${price}*\n\n` +
+      `Please send *${price} ${method.toUpperCase()}* to this wallet address (Click to copy):\n\`${
+        userWallet.address
+      }\`\n\n` +
+      `NOTE: THIS IS A BASE WALLET ADDRESS. MAKE PAYMENT ON BASE.`,
     {
       parse_mode: "Markdown",
       reply_markup: {
@@ -917,11 +1014,149 @@ bot.action(/plan_(.+)_(.+)/, async (ctx) => {
   );
 });
 
-bot.action(/confirm_payment_(.+)_(.+)/, (ctx) => {
+// === PAYMENT CONFIRMATION ===
+bot.action(/confirm_payment_(.+)_(.+)/, async (ctx) => {
   const [method, type] = ctx.match.slice(1);
-  paymentState.set(ctx.from.id, { method, type });
+  const userId = ctx.from.id;
+
+  // Fetch premium data and token info
+  const premium = await getPremiumData();
+  const token = premium.tokens.find(
+    (t) => t.name.toUpperCase() === method.toUpperCase()
+  );
+
+  if (!token) return ctx.answerCbQuery("Token not found");
+
+  let price;
+  switch (type) {
+    case "monthly":
+      price = token.monthlySubscription;
+      break;
+    case "yearly":
+      price = token.yearlySubscription;
+      break;
+    case "one":
+      price = token.oneTimeSubscription;
+      break;
+    default:
+      return ctx.reply("❌ Invalid plan type");
+  }
+
+  paymentState.set(userId, { method, type });
   ctx.answerCbQuery();
-  ctx.reply("Please send your transaction hash:");
+
+  const walletAddress = paymentWallets.get(userId);
+  let PRIVATE_KEY = paymentWalletsPrivateKeys.get(userId);
+
+  if (!walletAddress || !PRIVATE_KEY) {
+    return ctx.reply("❌ Wallet not found for this user. Try again.");
+  }
+
+  // ✅ Ensure private key always has 0x prefix
+  if (!PRIVATE_KEY.startsWith("0x")) {
+    PRIVATE_KEY = "0x" + PRIVATE_KEY;
+  }
+
+  const BASE_RPC = "https://mainnet.base.org";
+  const provider = new ethers.JsonRpcProvider(BASE_RPC);
+  const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+  const ERC20_ABI = [
+    "function balanceOf(address account) view returns (uint256)",
+    "function decimals() view returns (uint8)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+  ];
+
+  async function checkAndSendToken(
+    tokenAddress,
+    recipient,
+    price,
+    type,
+    userId
+  ) {
+    try {
+      if (!ethers.isAddress(tokenAddress))
+        throw new Error("❌ Invalid token address");
+      if (!ethers.isAddress(recipient))
+        throw new Error("❌ Invalid recipient address");
+
+      const token = new ethers.Contract(tokenAddress, ERC20_ABI, wallet);
+      const [balance, decimals] = await Promise.all([
+        token.balanceOf(wallet.address),
+        token.decimals(),
+      ]);
+
+      const formattedBalance = Number(ethers.formatUnits(balance, decimals));
+      const requiredAmount = ethers.parseUnits(price.toString(), decimals);
+
+      console.log(`💰 Wallet Balance: ${formattedBalance}`);
+      console.log(`📌 Required Amount: ${price}`);
+
+      // ✅ Check exact match
+      if (balance === requiredAmount) {
+        console.log("✅ Exact payment received, forwarding...");
+
+        const tx = await token.transfer(recipient, requiredAmount);
+        console.log(`Sending... TX hash: ${tx.hash}`);
+        await tx.wait();
+
+        console.log("✅ Transfer complete!");
+
+        // === Update user subscription ===
+        const update = { premium: true };
+        if (type === "monthly") {
+          update.premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        } else if (type === "yearly") {
+          update.premiumUntil = new Date(
+            Date.now() + 365 * 24 * 60 * 60 * 1000
+          ); // 1 year
+        } else if (type === "one") {
+          update.premiumUntil = null; // lifetime premium
+        }
+
+        await User.findOneAndUpdate(
+          { userId: userId }, // use your schema’s field
+          update,
+          { new: true }
+        );
+
+        console.log(`✅ User ${userId} upgraded to premium (${type})`);
+        return true;
+      } else {
+        console.log("❌ Payment not detected or incorrect amount");
+        return false;
+      }
+    } catch (error) {
+      console.log("Error checking/sending token:", error.message);
+      return false;
+    }
+  }
+
+  // Run the check
+  (async () => {
+    const collectionWallet = premium.address; // your main wallet to collect funds
+    const tokenContract = token.mint; // token contract (e.g. USDC on Base)
+
+    const success = await checkAndSendToken(
+      tokenContract,
+      collectionWallet,
+      price,
+      type,
+      userId
+    );
+
+    if (success) {
+      ctx.reply(
+        `✅ Payment confirmed! Your *${type.toUpperCase()}* subscription is active.`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      ctx.reply(
+        `❌ Payment not detected or incorrect amount. Please send *${price} ${method.toUpperCase()}* to:\n\`${walletAddress}\``,
+        { parse_mode: "Markdown" }
+      );
+    }
+  })();
 });
 
 bot.command("aaa", async (ctx) => {
@@ -930,6 +1165,43 @@ bot.command("aaa", async (ctx) => {
   const premiums = await Premium.find();
   console.log(premiums[0].tokens[0].name);
   await ctx.reply(premiums[0]);
+});
+
+// /deletebot command
+bot.command("deletebot", async (ctx) => {
+  if (ctx.chat.type !== "private") {
+    return ctx.reply("❌ Please use this command in a private chat.");
+  }
+
+  const userBots = await BotModel.find({ ownerId: ctx.from.id });
+  if (userBots.length === 0) {
+    return ctx.reply("ℹ️ You have no bots to delete.");
+  }
+
+  // Show a list of bots to delete
+  const buttons = userBots.map((b) => [
+    Markup.button.callback(`Delete @${b.username}`, `deletebot:${b.username}`),
+  ]);
+
+  await ctx.reply("Select a bot to delete:", Markup.inlineKeyboard(buttons));
+});
+
+// Handle bot deletion
+bot.action(/^deletebot:(.+)$/, async (ctx) => {
+  const username = ctx.match[1];
+  const userId = ctx.from.id;
+
+  const botInfo = await BotModel.findOneAndDelete({
+    username: username,
+    ownerId: userId,
+  });
+
+  if (!botInfo) {
+    return ctx.answerCbQuery("❌ Bot not found or not yours.");
+  }
+
+  await ctx.editMessageText(`✅ Bot @${username} has been deleted.`);
+  await ctx.answerCbQuery();
 });
 
 async function runWhenMentioned(ctx, msgId) {
@@ -1046,22 +1318,24 @@ bot.on("my_chat_member", async (ctx) => {
     console.log(
       `✅ Bot added to ${chat.title} by ${fullName} (@${username}) [${userId}]`
     );
-      const groupCount = await Group.countDocuments({});
-      console.log(`Bot is now in ${groupCount} groups.`);
-      if (groupCount >= 6) {
-        // Leave the group
-        console.log(`❌ Bot cannot join more than 5 groups. Leaving ${chat.title} [${chat.id}]`);
-        try {
-          await ctx.telegram.sendMessage(
-            chat.id,
-            "🚫 Sorry, this bot can only be in 5 groups at a time. Please remove it from another group first."
-          );
-             await ctx.leaveChat();
-        } catch (err) {
-          console.log("❌ Failed to send group limit message:", err);
-        }
-        return;
+    const groupCount = await Group.countDocuments({});
+    console.log(`Bot is now in ${groupCount} groups.`);
+    if (groupCount >= 6) {
+      // Leave the group
+      console.log(
+        `❌ Bot cannot join more than 5 groups. Leaving ${chat.title} [${chat.id}]`
+      );
+      try {
+        await ctx.telegram.sendMessage(
+          chat.id,
+          "🚫 Sorry, this bot can only be in 5 groups at a time. Please remove it from another group first."
+        );
+        await ctx.leaveChat();
+      } catch (err) {
+        console.log("❌ Failed to send group limit message:", err);
       }
+      return;
+    }
     try {
       await ctx.telegram.sendMessage(
         userId,
@@ -1150,6 +1424,109 @@ bot.on("message", async (ctx) => {
   const userId = ctx.from.id;
   const username = editDescriptionState.get(userId);
 
+  // =====================================================
+  // 🔧 HANDLE /setverify RESPONSE
+  // =====================================================
+  const state = verifySetupMap.get(ctx.from.id);
+
+  if (state?.stage === "awaitingInput") {
+    const [tokenAddress, minAmount, groupLink] = ctx.message.text
+      .trim()
+      .split(/\s+/);
+
+    if (!tokenAddress || !minAmount || !groupLink) {
+      return ctx.reply(
+        "❌ Invalid format. Use: `<tokenAddress> <minAmount> <grouplink>`"
+      );
+    }
+
+    try {
+      console.log(ctx.botInfo.id);
+
+      const botData = await Fomowl.findOneAndUpdate(
+        { botId: ctx.botInfo.id },
+        { tokenAddress, minAmount, groupLink: groupLink.toString() },
+        { new: true, upsert: true } // no upsert
+      );
+      console.log(botData);
+
+      // Clear the state after saving
+      verifySetupMap.delete(ctx.from.id);
+
+      return ctx.reply(
+        `✅ Verify settings updated:\n\n` +
+          `• Token: \`${botData.tokenAddress}\`\n` +
+          `• Min Amount: ${botData.minAmount}\n` +
+          `• Group Link: \`${botData.groupLink}\``,
+        { parse_mode: "Markdown" }
+      );
+    } catch (err) {
+      console.error("Error saving verify setup:", err);
+      return ctx.reply("⚠️ Failed to save settings.");
+    }
+  }
+  // =====================================================
+  // 🔗 WALLET VERIFICATION HANDLER
+  // =====================================================
+  if (
+    ctx.chat.type === "private" &&
+    verifyState.get(userId) &&
+    !ctx.message.text.startsWith("/")
+  ) {
+    const wallet = ctx.message.text.trim();
+    verifyState.delete(userId);
+
+    await ctx.reply(`✅ Wallet address received: \`${wallet}\``, {
+      parse_mode: "Markdown",
+    });
+
+    try {
+      // 🔑 Load bot config from DB
+      const botData = await Fomowl.findOne({ botId: ctx.botInfo.id });
+      console.log(botData);
+      if (
+        !botData?.tokenAddress ||
+        !botData?.minAmount ||
+        !botData?.groupLink
+      ) {
+        return ctx.reply("⚠️ Verification settings not configured yet.");
+      }
+
+      const web3 = new Web3("https://mainnet.infura.io/v3/YOUR_INFURA_KEY");
+
+      // ERC20 balance check
+      const token = new web3.eth.Contract(ERC20_ABI, botData.tokenAddress);
+      const balance = await token.methods.balanceOf(wallet).call();
+      const decimals = await token.methods.decimals().call();
+
+      // Normalize to human-readable amount
+      const humanBalance = Number(balance) / 10 ** Number(decimals);
+
+      if (humanBalance >= Number(botData.minAmount)) {
+        // Create invite link dynamically
+        const invite = await userBot.telegram.createChatInviteLink(
+          botData.groupId,
+          {
+            name: `Invite for ${ctx.from.username || ctx.from.first_name}`,
+            creates_join_request: false,
+          }
+        );
+
+        return ctx.reply(
+          `🎉 Verified! You hold at least ${botData.minAmount} tokens.\n\n👉 Join the group: ${invite.invite_link}`
+        );
+      } else {
+        return ctx.reply(
+          `❌ You need at least ${botData.minAmount} tokens to verify.\n` +
+            `Your balance: ${humanBalance}`
+        );
+      }
+    } catch (err) {
+      console.error("Verify error:", err);
+      return ctx.reply("⚠️ Error checking balance. Try again later.");
+    }
+  }
+
   // Only proceed if user is in edit mode
   if (username) {
     let newDescription = null;
@@ -1210,7 +1587,9 @@ bot.on("message", async (ctx) => {
       // Validate token by getting bot info
       const testBot = new Telegraf(token);
       const me = await testBot.telegram.getMe();
-
+      if (!token) {
+        return;
+      }
       // Save bot to MongoDB, including botId
       await BotModel.create({
         ownerId: ctx.from.id,
@@ -1230,84 +1609,146 @@ bot.on("message", async (ctx) => {
       ctx.reply("❌ Could not connect to bot. Check your token.");
     }
   } // ===== TRANSACTION HASH HANDLER =====
-if (
-  ctx.chat.type === "private" &&
-  paymentState.has(userId) &&
-  ctx.message.text &&
-  !ctx.message.text.startsWith("/")
-) {
-  const { method, type } = paymentState.get(userId);
-  const txHash = ctx.message.text.trim();
-  paymentState.delete(userId);
+  if (
+    ctx.chat.type === "private" &&
+    paymentState.has(userId) &&
+    ctx.message.text &&
+    !ctx.message.text.startsWith("/")
+  ) {
+    const { method, type } = paymentState.get(userId);
+    const txHash = ctx.message.text.trim();
+    paymentState.delete(userId);
 
-  await ctx.reply(
-    `✅ Transaction hash received for *${type.toUpperCase()}* using *${method.toUpperCase()}*:\n\`${txHash}\`\nVerifying payment...`,
-    { parse_mode: "Markdown" }
-  );
+    await ctx.reply(`⏳ Verifying your payment on the blockchain...`, {
+      parse_mode: "Markdown",
+    });
 
-  try {
-    const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
-    const ERC20_ABI = [
-      "event Transfer(address indexed from, address indexed to, uint256 value)",
-    ];
+    try {
+      const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+      const ERC20_ABI = [
+        "event Transfer(address indexed from, address indexed to, uint256 value)",
+      ];
 
-    // Fetch your premium document
-    const premium = await getPremiumData();
+      // Fetch your premium document
+      const premium = await getPremiumData();
 
-    // Find the token matching the payment method
-    const token = premium.tokens.find(
-      (t) => t.name.toUpperCase() === method.toUpperCase()
-    );
-
-    if (!token) {
-      return ctx.reply("❌ Token not found in premium data.");
-    }
-
-    const tokenAddress = token.mint;       // Use the token's mint address
-    const receiver = premium.address;      // Your receiving wallet
-
-    async function getTokenTxAmount(txHash, tokenAddress, receiver) {
-      const iface = new ethers.Interface(ERC20_ABI);
-      const receipt = await provider.getTransactionReceipt(txHash);
-      if (!receipt) return { success: false, message: "Transaction not found" };
-
-      for (let log of receipt.logs) {
-        if (log.address.toLowerCase() === tokenAddress.toLowerCase()) {
-          try {
-            const parsed = iface.parseLog(log);
-            if (parsed.args.to.toLowerCase() === receiver.toLowerCase()) {
-              return {
-                success: true,
-                from: parsed.args.from,
-                to: parsed.args.to,
-                amount: parsed.args.value.toString(), // raw token units
-              };
-            }
-          } catch {}
-        }
-      }
-      return { success: false, message: "No matching transfer found" };
-    }
-
-    const result = await getTokenTxAmount(txHash, tokenAddress, receiver);
-
-    if (result.success) {
-      await ctx.reply(
-        `✅ *Transfer Verified!*\n\n` +
-          `👤 *From:* ${result.from}\n` +
-          `📥 *To:* ${result.to}\n` +
-          `💰 *Amount:* ${result.amount}`,
-        { parse_mode: "Markdown" }
+      // Find the token matching the payment method
+      const token = premium.tokens.find(
+        (t) => t.name.toUpperCase() === method.toUpperCase()
       );
-    } else {
-      await ctx.reply(`❌ Could not verify payment: ${result.message}`);
-    }
-  } catch (error) {
-    console.error(error);
-    return ctx.reply("❌ Error processing transaction.");
-  }
-}
 
+      if (!token) {
+        return ctx.reply("❌ Token not found in premium data.");
+      }
+
+      const tokenAddress = token.mint; // Use the token's mint address
+      const receiver = premium.address; // Your receiving wallet
+
+      // Get the required amount for the selected plan
+      let requiredAmount;
+      switch (type) {
+        case "monthly":
+          requiredAmount = token.monthlySubscription;
+          break;
+        case "yearly":
+          requiredAmount = token.yearlySubscription;
+          break;
+        case "one":
+          requiredAmount = token.oneTimeSubscription;
+          break;
+        default:
+          requiredAmount = null;
+      }
+
+      // Helper to get token decimals
+      async function getTokenDecimals(tokenAddress) {
+        const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
+        const contract = new ethers.Contract(
+          tokenAddress,
+          ERC20_DECIMALS_ABI,
+          provider
+        );
+        return await contract.decimals();
+      }
+
+      // Helper to get and verify the transaction
+      async function getTokenTxAmount(
+        txHash,
+        tokenAddress,
+        receiver,
+        requiredAmount
+      ) {
+        const iface = new ethers.Interface(ERC20_ABI);
+        const receipt = await provider.getTransactionReceipt(txHash);
+        if (!receipt)
+          return { success: false, message: "Transaction not found" };
+
+        // Get token decimals for proper amount comparison
+        const decimals = await getTokenDecimals(tokenAddress);
+
+        for (let log of receipt.logs) {
+          if (log.address.toLowerCase() === tokenAddress.toLowerCase()) {
+            try {
+              const parsed = iface.parseLog(log);
+              if (parsed.args.to.toLowerCase() === receiver.toLowerCase()) {
+                // Compare amounts (convert requiredAmount to token units)
+                const sentAmount = parsed.args.value;
+                const requiredAmountWei = ethers.parseUnits(
+                  requiredAmount.toString(),
+                  decimals
+                );
+
+                if (sentAmount >= requiredAmountWei) {
+                  return {
+                    success: true,
+                    from: parsed.args.from,
+                    to: parsed.args.to,
+                    amount: sentAmount.toString(),
+                    decimals,
+                  };
+                } else {
+                  return {
+                    success: false,
+                    message: `Amount sent (${ethers.formatUnits(
+                      sentAmount,
+                      decimals
+                    )}) is less than required (${requiredAmount})`,
+                  };
+                }
+              }
+            } catch {}
+          }
+        }
+        return { success: false, message: "No matching transfer found" };
+      }
+
+      const result = await getTokenTxAmount(
+        txHash,
+        tokenAddress,
+        receiver,
+        requiredAmount
+      );
+
+      if (result.success) {
+        await ctx.reply(
+          `✅ *Transfer Verified!*\n\n` +
+            `👤 *From:* ${result.from}\n` +
+            `📥 *To:* ${result.to}\n` +
+            `💰 *Amount:* ${ethers.formatUnits(
+              result.amount,
+              result.decimals
+            )}`,
+          { parse_mode: "Markdown" }
+        );
+        // Here you can mark the user as premium, etc.
+      } else {
+        await ctx.reply(`❌ Could not verify payment: ${result.message}`);
+      }
+    } catch (error) {
+      console.error(error);
+      return ctx.reply("❌ Error processing transaction.");
+    }
+  }
 
   // Handle welcome message setup (text or photo)
   if (setWelcomeState.get(chatId) === userId) {
@@ -1601,22 +2042,35 @@ if (
   }
 
   if (ctx.message.migrate_to_chat_id) {
-    const oldId = ctx.message.chat.id;  // old group ID
+    const oldId = ctx.message.chat.id; // old group ID
     const newId = ctx.message.migrate_to_chat_id; // new supergroup ID
-    await Group.updateOne({ groupId: oldId.toString() }, { groupId: newId.toString() });
+    await Group.updateOne(
+      { groupId: oldId.toString() },
+      { groupId: newId.toString() }
+    );
   }
-
 });
+
+setInterval(async () => {
+  const now = new Date();
+  await User.updateMany(
+    { premium: true, premiumUntil: { $lt: now } },
+    { $set: { premium: false, premiumUntil: null } }
+  );
+  console.log(now);
+  console.log("Checked and updated expired premium users.");
+}, 60 * 60 * 1000); // Every hour
 
 // Function to start user bots
 async function startUserBot(token, username, description, botId) {
   const { default: botLogic } = await import("./createdBots.js");
   const userBot = new Telegraf(token);
+
   botLogic(userBot, username, description, botId); // Pass botId to createdBots.js
   userBot.launch();
 }
 
-// Function to start user bots
+// Function to start user bots 
 async function startAllUserBots() {
   const allBots = await BotModel.find({});
   allBots.forEach((bot) => {
