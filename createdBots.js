@@ -734,7 +734,7 @@ ${question}
       return ctx.reply("🔗 Please send your wallet address.");
     } else {
       return ctx.reply(
-        "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
+        "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIbot)",
         { parse_mode: "Markdown" }
       );
     }
@@ -746,7 +746,7 @@ ${question}
       return ctx.reply("💎 Please pay for premium in the FomoWol main bot.");
     } else {
       return ctx.reply(
-        "👋 To upgrade to premium, please DM me and use /premium there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
+        "👋 To upgrade to premium, please DM me and use /premium there.\n[Click here to DM](https://t.me/FOMOwlAIbot)",
         { parse_mode: "Markdown" }
       );
     }

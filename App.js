@@ -64,14 +64,14 @@ bot.start(async (ctx) => {
           `✅ I keep your chats alive (raids, auto-engagement, activity boosts)\n` +
           `✅ I keep you updated (announcements & alerts)\n\n` +
           `Type <b>/help</b> to explore everything I can do for you.\n\n` +
-          `📢 Stay in the loop → Join our <a href="https://t.me/fomowlaibothq">Channel</a> for updates, new features, and tips!`,
+          `📢 Stay in the loop → Join our <a href="https://t.me/FOMOwlAIbothq">Channel</a> for updates, new features, and tips!`,
         {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([
             [
               Markup.button.url(
                 "➕ Add me to your chat!",
-                "https://t.me/FOMOwlAIbot?startgroup" 
+                "https://t.me/FOMOwlAIbot?startgroup"
               ),
             ],
           ]),
@@ -105,7 +105,7 @@ bot.command("setwelcome", async (ctx) => {
   return ctx.reply("✍️ Please send the welcome message you want to set.");
 });
 
-// ====================== 
+// ======================
 // SET TOGGLE WELCOME MESSAGE
 // ======================
 bot.command("togglewelcome", async (ctx) => {
@@ -644,7 +644,7 @@ bot.command("verify", async (ctx) => {
     return ctx.reply("🔗 Please send your wallet address.");
   } else {
     return ctx.reply(
-      "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
+      "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIbot)",
       { parse_mode: "Markdown" }
     );
   }
@@ -673,7 +673,7 @@ bot.command("createbot", async (ctx) => {
     );
   } else {
     return ctx.reply(
-      "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
+      "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/FOMOwlAIbot)",
       { parse_mode: "Markdown" }
     );
   }

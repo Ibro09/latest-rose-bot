@@ -8,5 +8,5 @@ const userSchema = new mongoose.Schema({
   premiumUntil: { type: Date, default: null },
 });
 
-// module.exports = mongoose.model('FOMOwlAIBotUser', userSchema);
-export default mongoose.model("FOMOwlAIBotUser", userSchema);
+// module.exports = mongoose.model('FOMOwlAIbotUser', userSchema);
+export default mongoose.model("FOMOwlAIbotUser", userSchema);

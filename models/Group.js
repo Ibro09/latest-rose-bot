@@ -15,6 +15,6 @@ const groupSchema = new mongoose.Schema({
   goodbyePhotoId: { type: String, default: null },
 });
 
-// module.exports = mongoose.model("FOMOwlAIBotGroup", groupSchema);
+// module.exports = mongoose.model("FOMOwlAIbotGroup", groupSchema);
 
-export default mongoose.model("FOMOwlAIBotGroup", groupSchema);
+export default mongoose.model("FOMOwlAIbotGroup", groupSchema);
