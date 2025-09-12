@@ -1,4 +1,4 @@
-import { Telegraf, Markup,session  } from "telegraf";
+import { Telegraf, Markup, session } from "telegraf";
 import fs from "fs";
 import dotenv from "dotenv";
 import connectDB from "./db.js";
@@ -12,18 +12,18 @@ import Web3 from "web3";
 
 const ERC20_ABI = [
   {
-    "constant": true,
-    "inputs": [{ "name": "_owner", "type": "address" }],
-    "name": "balanceOf",
-    "outputs": [{ "name": "balance", "type": "uint256" }],
-    "type": "function",
+    constant: true,
+    inputs: [{ name: "_owner", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "balance", type: "uint256" }],
+    type: "function",
   },
   {
-    "constant": true,
-    "inputs": [],
-    "name": "decimals",
-    "outputs": [{ "name": "", "type": "uint8" }],
-    "type": "function",
+    constant: true,
+    inputs: [],
+    name: "decimals",
+    outputs: [{ name: "", type: "uint8" }],
+    type: "function",
   },
 ];
 dotenv.config();
@@ -79,8 +79,8 @@ ${question}
   }
   // Connect to MongoDB
   connectDB(process.env.MONGODB_URI);
-// Enable session middleware
-// userBot.use(session());
+  // Enable session middleware
+  // userBot.use(session());
   const welcomeMessages = new Map(); // { chatId: welcomeText }
   const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
   const setWelcomeState = new Map(); // chatId -> userId
@@ -699,33 +699,33 @@ ${question}
 
   // OWNER: set verify requirements
 
-// Global map to track verify states per user
-const verifySetupMap = new Map();
+  // Global map to track verify states per user
+  const verifySetupMap = new Map();
 
-// Step 1: Start setup
-userBot.command("setverify", async (ctx) => {
-  try {
-    const botRecord = await BotModel.findOne({ botId: ctx.botInfo.id }); // find the current bot’s record
+  // Step 1: Start setup
+  userBot.command("setverify", async (ctx) => {
+    try {
+      const botRecord = await BotModel.findOne({ botId: ctx.botInfo.id }); // find the current bot’s record
 
-    if (!botRecord) {
-      return ctx.reply("❌ Bot record not found in DB.");
+      if (!botRecord) {
+        return ctx.reply("❌ Bot record not found in DB.");
+      }
+
+      // 🔑 Check if the person issuing the command is the owner
+      if (Number(botRecord.ownerId) !== Number(ctx.from.id)) {
+        return ctx.reply("⚠️ You are not the owner of this bot.");
+      }
+
+      // ✅ Owner verified
+      verifySetupMap.set(ctx.from.id, { stage: "awaitingInput" });
+      ctx.reply(
+        "✍️ Send settings in format: <tokenAddress> <minAmount> <groupLink>"
+      );
+    } catch (err) {
+      console.error("Error in /setverify:", err);
+      ctx.reply("⚠️ Something went wrong while verifying ownership.");
     }
-
-    // 🔑 Check if the person issuing the command is the owner
-    if (Number(botRecord.ownerId) !== Number(ctx.from.id)) {
-      return ctx.reply("⚠️ You are not the owner of this bot.");
-    }
-
-    // ✅ Owner verified
-    verifySetupMap.set(ctx.from.id, { stage: "awaitingInput" });
-    ctx.reply("✍️ Send settings in format: <tokenAddress> <minAmount> <groupLink>");
-  } catch (err) {
-    console.error("Error in /setverify:", err);
-    ctx.reply("⚠️ Something went wrong while verifying ownership.");
-  }
-});
-
-
+  });
 
   // USER: start verify
   userBot.command("verify", async (ctx) => {
@@ -734,7 +734,7 @@ userBot.command("setverify", async (ctx) => {
       return ctx.reply("🔗 Please send your wallet address.");
     } else {
       return ctx.reply(
-        "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/latestrosebot)",
+        "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
         { parse_mode: "Markdown" }
       );
     }
@@ -746,7 +746,7 @@ userBot.command("setverify", async (ctx) => {
       return ctx.reply("💎 Please pay for premium in the FomoWol main bot.");
     } else {
       return ctx.reply(
-        "👋 To upgrade to premium, please DM me and use /premium there.\n[Click here to DM](https://t.me/latestrosebot)",
+        "👋 To upgrade to premium, please DM me and use /premium there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
         { parse_mode: "Markdown" }
       );
     }
@@ -967,92 +967,100 @@ userBot.command("setverify", async (ctx) => {
     // =====================================================
     const state = verifySetupMap.get(ctx.from.id);
 
-  if (state?.stage === "awaitingInput") {
-    const [tokenAddress, minAmount, groupLink] = ctx.message.text.trim().split(/\s+/);
+    if (state?.stage === "awaitingInput") {
+      const [tokenAddress, minAmount, groupLink] = ctx.message.text
+        .trim()
+        .split(/\s+/);
 
-    if (!tokenAddress || !minAmount || !groupLink) {
-      return ctx.reply("❌ Invalid format. Use: `<tokenAddress> <minAmount> <grouplink>`");
+      if (!tokenAddress || !minAmount || !groupLink) {
+        return ctx.reply(
+          "❌ Invalid format. Use: `<tokenAddress> <minAmount> <grouplink>`"
+        );
+      }
+
+      try {
+        const botData = await BotModel.findOneAndUpdate(
+          { botId: ctx.botInfo.id },
+          { tokenAddress, minAmount, groupLink: groupLink.toString() },
+          { new: true, upsert: true }
+        );
+
+        // Clear the state after saving
+        verifySetupMap.delete(ctx.from.id);
+
+        return ctx.reply(
+          `✅ Verify settings updated:\n\n` +
+            `• Token: \`${botData.tokenAddress}\`\n` +
+            `• Min Amount: ${botData.minAmount}\n` +
+            `• Group ID: \`${botData.groupId}\``,
+          { parse_mode: "Markdown" }
+        );
+      } catch (err) {
+        console.error("Error saving verify setup:", err);
+        return ctx.reply("⚠️ Failed to save settings.");
+      }
     }
-
-    try {
-      const botData = await BotModel.findOneAndUpdate(
-        { botId: ctx.botInfo.id },
-        { tokenAddress, minAmount, groupLink: groupLink.toString() },
-        { new: true, upsert: true }
-      );
-
-      // Clear the state after saving
-      verifySetupMap.delete(ctx.from.id);
-
-      return ctx.reply(
-        `✅ Verify settings updated:\n\n` +
-        `• Token: \`${botData.tokenAddress}\`\n` +
-        `• Min Amount: ${botData.minAmount}\n` +
-        `• Group ID: \`${botData.groupId}\``,
-        { parse_mode: "Markdown" }
-      );
-    } catch (err) {
-      console.error("Error saving verify setup:", err);
-      return ctx.reply("⚠️ Failed to save settings.");
-    }
-  }
     // =====================================================
     // 🔗 WALLET VERIFICATION HANDLER
     // =====================================================
-  if (
-    ctx.chat.type === "private" &&
-    verifyState.get(userId) &&
-    !ctx.message.text.startsWith("/")
-  ) {
-    const wallet = ctx.message.text.trim();
-    verifyState.delete(userId);
+    if (
+      ctx.chat.type === "private" &&
+      verifyState.get(userId) &&
+      !ctx.message.text.startsWith("/")
+    ) {
+      const wallet = ctx.message.text.trim();
+      verifyState.delete(userId);
 
-    await ctx.reply(`✅ Wallet address received: \`${wallet}\``, {
-      parse_mode: "Markdown",
-    });
+      await ctx.reply(`✅ Wallet address received: \`${wallet}\``, {
+        parse_mode: "Markdown",
+      });
 
-    try {
-      // 🔑 Load bot config from DB
-      const botData = await BotModel.findOne({ botId: ctx.botInfo.id });
-      console.log(botata)
-      if (!botData?.tokenAddress || !botData?.minAmount || !botData?.groupLink) {
-        return ctx.reply("⚠️ Verification settings not configured yet.");
+      try {
+        // 🔑 Load bot config from DB
+        const botData = await BotModel.findOne({ botId: ctx.botInfo.id });
+        console.log(botata);
+        if (
+          !botData?.tokenAddress ||
+          !botData?.minAmount ||
+          !botData?.groupLink
+        ) {
+          return ctx.reply("⚠️ Verification settings not configured yet.");
+        }
+
+        const web3 = new Web3("https://mainnet.infura.io/v3/YOUR_INFURA_KEY");
+
+        // ERC20 balance check
+        const token = new web3.eth.Contract(ERC20_ABI, botData.tokenAddress);
+        const balance = await token.methods.balanceOf(wallet).call();
+        const decimals = await token.methods.decimals().call();
+
+        // Normalize to human-readable amount
+        const humanBalance = Number(balance) / 10 ** Number(decimals);
+
+        if (humanBalance >= Number(botData.minAmount)) {
+          // Create invite link dynamically
+          const invite = await userBot.telegram.createChatInviteLink(
+            botData.groupId,
+            {
+              name: `Invite for ${ctx.from.username || ctx.from.first_name}`,
+              creates_join_request: false,
+            }
+          );
+
+          return ctx.reply(
+            `🎉 Verified! You hold at least ${botData.minAmount} tokens.\n\n👉 Join the group: ${invite.invite_link}`
+          );
+        } else {
+          return ctx.reply(
+            `❌ You need at least ${botData.minAmount} tokens to verify.\n` +
+              `Your balance: ${humanBalance}`
+          );
+        }
+      } catch (err) {
+        console.error("Verify error:", err);
+        return ctx.reply("⚠️ Error checking balance. Try again later.");
       }
-
-      const web3 = new Web3("https://mainnet.infura.io/v3/YOUR_INFURA_KEY");
-
-      // ERC20 balance check
-      const token = new web3.eth.Contract(ERC20_ABI, botData.tokenAddress);
-      const balance = await token.methods.balanceOf(wallet).call();
-      const decimals = await token.methods.decimals().call();
-
-      // Normalize to human-readable amount
-      const humanBalance = Number(balance) / 10 ** Number(decimals);
-
-      if (humanBalance >= Number(botData.minAmount)) {
-        // Create invite link dynamically
-        const invite = await userBot.telegram.createChatInviteLink(
-          botData.groupId,
-          {
-            name: `Invite for ${ctx.from.username || ctx.from.first_name}`,
-            creates_join_request: false,
-          }
-        );
-
-        return ctx.reply(
-          `🎉 Verified! You hold at least ${botData.minAmount} tokens.\n\n👉 Join the group: ${invite.invite_link}`
-        );
-      } else {
-        return ctx.reply(
-          `❌ You need at least ${botData.minAmount} tokens to verify.\n` +
-          `Your balance: ${humanBalance}`
-        );
-      }
-    } catch (err) {
-      console.error("Verify error:", err);
-      return ctx.reply("⚠️ Error checking balance. Try again later.");
     }
-  }
     if (
       ctx.chat.type === "private" &&
       verifyState.get(ctx.from.id) &&

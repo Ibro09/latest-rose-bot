@@ -7,10 +7,10 @@
     "start": "node App.js",
     "dev": "nodemon App.js"
   },
-  "author": "Your Name",
+  "author": "ibrahim",
   "license": "ISC",
   "type": "module",
-  "dependencies": {
+  "dependencies": { 
     "@google/genai": "^1.13.0",
     "axios": "^1.11.0",
     "dotenv": "^17.2.1",

@@ -8,15 +8,13 @@ const groupSchema = new mongoose.Schema({
   welcomeMessage: { type: String, default: "" },
   isGoodbye: { type: Boolean, default: true },
   goodbyeMessage: { type: String, default: "" },
-  spam:{type: Boolean, default: false},
+  spam: { type: Boolean, default: false },
   joinedAt: { type: Date, default: Date.now },
   welcomePhotoId: { type: String, default: null },
   // Add these fields if not present
-goodbyePhotoId: { type: String, default: null },
+  goodbyePhotoId: { type: String, default: null },
 });
 
-// module.exports = mongoose.model("LatestRoseBotGroup", groupSchema);
+// module.exports = mongoose.model("FOMOwlAIBotGroup", groupSchema);
 
-export default mongoose.model("LatestRoseBotGroup", groupSchema);
-
-  
+export default mongoose.model("FOMOwlAIBotGroup", groupSchema);

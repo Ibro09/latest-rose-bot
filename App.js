@@ -43,7 +43,9 @@ bot.start(async (ctx) => {
   try {
     if (ctx.chat.type === "private") {
       const tgId = ctx.from.id;
-      const name = ctx.from.first_name || "there";
+      const fullName = `${ctx.from.first_name || ""} ${
+        ctx.from.last_name || ""
+      }`.trim();
       const username = ctx.from.username;
 
       // ✅ Save user to database if not already present
@@ -54,18 +56,22 @@ bot.start(async (ctx) => {
       } else {
         console.log(`👤 Returning user: ${tgId}`);
       }
-      const names = ctx.from.first_name || "there";
 
       return ctx.reply(
-        `Hey <b>${name}</b>! My name is <b>${ctx.botInfo.first_name}</b> – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
-          `Join my <a href="https://t.me/your_news_channel">news channel</a> to get information on all the latest updates.\n\n`,
+        `👋 Hey <b>${fullName}</b>!\n` +
+          `I’m <b>FOMOwl AI Chatbot</b> – your all in one community assistant.\n\n` +
+          `✅ I keep your groups safe (anti-spam & wallet verification)\n` +
+          `✅ I keep your chats alive (raids, auto-engagement, activity boosts)\n` +
+          `✅ I keep you updated (announcements & alerts)\n\n` +
+          `Type <b>/help</b> to explore everything I can do for you.\n\n` +
+          `📢 Stay in the loop → Join our <a href="https://t.me/fomowlaibothq">Channel</a> for updates, new features, and tips!`,
         {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([
             [
               Markup.button.url(
                 "➕ Add me to your chat!",
-                "https://t.me/latestrosebot?startgroup"
+                "https://t.me/FOMOwlAIBot?startgroup" 
               ),
             ],
           ]),
@@ -99,7 +105,7 @@ bot.command("setwelcome", async (ctx) => {
   return ctx.reply("✍️ Please send the welcome message you want to set.");
 });
 
-// ======================
+// ====================== 
 // SET TOGGLE WELCOME MESSAGE
 // ======================
 bot.command("togglewelcome", async (ctx) => {
@@ -371,25 +377,25 @@ bot.command("addfilter", async (ctx) => {
 // ======================
 bot.command("help", async (ctx) => {
   const helpMessage = `
-                          🤖 *Bot Commands*
-                          /start - Start interacting with the bot
-                          /help - Show this help menu
-                          /setwelcome - Set welcome message
-                          /togglewelcome - Enable/disable welcome message
-                          /removewelcome - Remove welcome message
-                          /setgoodbye - Set goodbye message
-                          /togglegoodbye - Enable/disable goodbye message
-                          /removegoodbye - Remove goodbye message
-                          /ban - 🚫 Ban a user (reply to user)
-                          /mute - 🔇 Mute a user (reply to user)
-                          /unmute - 🔊 Unmute a user (reply to user)
-                          /addfilter - ➕ Add a banned word
-                          /removefilter - ➖ Remove a banned word
-                          /listfilters - 📃 List banned words
-                          /spam - 🛡️ Enable/disable spam protection
+🤖 *Bot Commands*
+/start - Start interacting with the bot
+/help - Show this help menu
+/setwelcome - Set welcome message
+/togglewelcome - Enable/disable welcome message
+/removewelcome - Remove welcome message
+/setgoodbye - Set goodbye message
+/togglegoodbye - Enable/disable goodbye message
+/removegoodbye - Remove goodbye message
+/ban - 🚫 Ban a user (reply to user)
+/mute - 🔇 Mute a user (reply to user)
+/unmute - 🔊 Unmute a user (reply to user)
+/addfilter - ➕ Add a banned word
+/removefilter - ➖ Remove a banned word
+/listfilters - 📃 List banned words
+/spam - 🛡️ Enable/disable spam protection
 
-                          💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
-                          `;
+💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
+`;
 
   ctx.reply(helpMessage, { parse_mode: "Markdown" });
 });
@@ -638,7 +644,7 @@ bot.command("verify", async (ctx) => {
     return ctx.reply("🔗 Please send your wallet address.");
   } else {
     return ctx.reply(
-      "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/latestrosebot)",
+      "👋 To verify, please DM me and use /verify there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
       { parse_mode: "Markdown" }
     );
   }
@@ -667,7 +673,7 @@ bot.command("createbot", async (ctx) => {
     );
   } else {
     return ctx.reply(
-      "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/latestrosebot)",
+      "👋 To create your own bot, please DM me and use /createBot there.\n[Click here to DM](https://t.me/FOMOwlAIBot)",
       { parse_mode: "Markdown" }
     );
   }
@@ -2070,7 +2076,7 @@ async function startUserBot(token, username, description, botId) {
   userBot.launch();
 }
 
-// Function to start user bots 
+// Function to start user bots
 async function startAllUserBots() {
   const allBots = await BotModel.find({});
   allBots.forEach((bot) => {
