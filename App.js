@@ -71,7 +71,7 @@ bot.start(async (ctx) => {
             [
               Markup.button.url(
                 "➕ Add me to your chat!",
-                "https://t.me/FOMOwlAIBot?startgroup" 
+                "https://t.me/FOMOwlAIbot?startgroup" 
               ),
             ],
           ]),
