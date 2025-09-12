@@ -79,8 +79,28 @@ ${question}
   }
   // Connect to MongoDB
   connectDB(process.env.MONGODB_URI);
-  // Enable session middleware
-  // userBot.use(session());
+
+
+userBot.telegram.setMyCommands([
+  { command: "start", description: "Start interacting with the bot" },
+  { command: "help", description: "Show help menu" },
+  { command: "setwelcome", description: "Set welcome message (group only)" },
+  { command: "togglewelcome", description: "Enable/disable welcome message" },
+  { command: "removewelcome", description: "Remove welcome message" },
+  { command: "setgoodbye", description: "Set goodbye message (group only)" },
+  { command: "togglegoodbye", description: "Enable/disable goodbye message" },
+  { command: "removegoodbye", description: "Remove goodbye message" },
+  { command: "ban", description: "Ban a user (reply in group)" },
+  { command: "mute", description: "Mute a user (reply in group)" },
+  { command: "unmute", description: "Unmute a user (reply in group)" },
+  { command: "addfilter", description: "Add a banned word (group only)" },
+  { command: "removefilter", description: "Remove a banned word (group only)" },
+  { command: "listfilters", description: "List banned words (group only)" },
+  { command: "spam", description: "Enable/disable spam protection (group only)" },
+  { command: "verify", description: "Start wallet verification (private chat)" },
+  { command: "premium", description: "Show premium payment options" }
+]);
+
   const welcomeMessages = new Map(); // { chatId: welcomeText }
   const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
   const setWelcomeState = new Map(); // chatId -> userId
@@ -111,29 +131,38 @@ ${question}
   userBot.start(async (ctx) => {
     try {
       if (ctx.chat.type === "private") {
+          const me = await userBot.telegram.getMe();
+  const botName = me.first_name;
         const tgId = ctx.from.id;
-        const name = ctx.from.first_name || "there";
+        const fullName = `${ctx.from.first_name || ""} ${
+          ctx.from.last_name || ""
+        }`.trim();
+        const username = ctx.from.username;
 
         // ✅ Save user to database if not already present
         const existingUser = await User.findOne({ userId: tgId });
         if (!existingUser) {
-          await new User({ userId: tgId }).save();
+          await new User({ userId: tgId, username }).save();
           console.log(`🆕 New user saved: ${tgId}`);
         } else {
           console.log(`👤 Returning user: ${tgId}`);
         }
-        const names = ctx.from.first_name || "there";
 
         return ctx.reply(
-          `Hey <b>${name}</b>! My name is <b>${ctx.botInfo.first_name}</b> – I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.\n\n` +
-            `Join my <a href="https://t.me/your_news_channel">news channel</a> to get information on all the latest updates.\n\n`,
+          `👋 Hey <b>${fullName}</b>!\n` +
+            `I’m <b>${botName}</b> – your all in one community assistant.\n\n` +
+            `✅ I keep your groups safe (anti-spam & wallet verification)\n` +
+            `✅ I keep your chats alive (raids, auto-engagement, activity boosts)\n` +
+            `✅ I keep you updated (announcements & alerts)\n\n` +
+            `Type <b>/help</b> to explore everything I can do for you.\n\n` +
+            `📢 Stay in the loop → Join our <a href="https://t.me/FOMOwlAIbothq">Channel</a> for updates, new features, and tips!`,
           {
             parse_mode: "HTML",
             ...Markup.inlineKeyboard([
               [
                 Markup.button.url(
-                  "➕ Add me to your chat!",
-                  `https://t.me/${Username}?startgroup`
+                  "➕ Add me to your group!",
+                  `https://t.me/${botUsername}?startgroup`
                 ),
               ],
             ]),
@@ -141,7 +170,7 @@ ${question}
         );
       } else {
         return ctx.reply(
-          `❗ Please start a private chat with me to use this command. DM me here: https://t.me/${Username}`
+          `❗ Please start a private chat with me to use this command. DM me here: https://t.me/${ctx.botInfo.username}`
         );
       }
     } catch (error) {
@@ -149,6 +178,7 @@ ${question}
       return ctx.reply("⚠️ Something went wrong. Please try again later.");
     }
   });
+
 
   // ======================
   // SET WLCOME MESSAGE
@@ -439,31 +469,49 @@ ${question}
   // ======================
   // HELP
   // ======================
-  userBot.command("help", async (ctx) => {
-    const helpMessage = `
-🤖 *Bot Commands*
+userBot.command("help", async (ctx) => {
+  const helpMessage = `
+🤖 <b>Bot Help & Commands</b>
+
+<b>General</b>
 /start - Start interacting with the bot
 /help - Show this help menu
-/setwelcome - Set welcome message
-/togglewelcome - Enable/disable welcome message
-/removewelcome - Remove welcome message
-/setgoodbye - Set goodbye message
-/togglegoodbye - Enable/disable goodbye message
-/removegoodbye - Remove goodbye message
-/ban - 🚫 Ban a user (reply to user)
-/mute - 🔇 Mute a user (reply to user)
-/unmute - 🔊 Unmute a user (reply to user)
-/addfilter - ➕ Add a banned word
-/removefilter - ➖ Remove a banned word
-/listfilters - 📃 List banned words
-/spam - 🛡️ Enable/disable spam protection
 
-💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
-`;
+<b>Group Management</b>
+/setwelcome - Set a welcome message (group only)
+/togglewelcome on|off - Enable or disable welcome messages
+/removewelcome - Remove the welcome message
+/setgoodbye - Set a goodbye message (group only)
+/togglegoodbye on|off - Enable or disable goodbye messages
+/removegoodbye - Remove the goodbye message
 
-    ctx.reply(helpMessage, { parse_mode: "Markdown" });
-  });
+<b>Moderation</b>
+/ban - Ban a user (reply to their message, group only)
+/mute - Mute a user for 2 hours (reply to their message, group only)
+/unmute - Unmute a user (reply to their message, group only)
+/addfilter [word] - Add a banned word or link (group only)
+/removefilter [word] - Remove a banned word or link (group only)
+/listfilters - List all banned words/links (group only)
+/spam on|off - Enable or disable spam protection (group only)
 
+<b>Verification</b>
+/verify - Start wallet verification (private chat only)
+
+<b>Premium</b>
+/premium - Get premium info (private chat only)
+
+<b>AI Assistant</b>
+Mention or reply to the bot in a group to use the AI assistant (if enabled for your group).
+
+<b>Notes:</b>
+• Most group commands require admin rights.
+• Use commands in private chat for verification and premium info.
+• Welcome and goodbye messages support {name} and {username} placeholders.
+
+<i>Need more help? Contact your group admin or the bot owner.</i>
+  `;
+  ctx.reply(helpMessage, { parse_mode: "HTML", disable_web_page_preview: true });
+});
   // ======================
   // REMOVE FILTER
   // ======================

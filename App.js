@@ -31,11 +31,38 @@ connectDB(process.env.MONGODB_URI);
 
 const welcomeMessages = new Map(); // { chatId: welcomeText }
 const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
-const setWelcomeState = new Map(); // chatId -> userId
+const setWelcomeState = new Map(); // chatId -> userId 
 const setGoodbyeState = new Map(); // chatId -> userId
 const newBotToken = new Map(); // userId -> true
 const paymentWallets = new Map(); // userId -> walletAddress
 const paymentWalletsPrivateKeys = new Map(); // userId -> privateKey
+
+// Set command suggestions
+bot.telegram.setMyCommands([
+  { command: "start", description: "Start interacting with the bot" },
+  { command: "help", description: "Show help menu" },
+  { command: "setwelcome", description: "Set welcome message (group only)" },
+  { command: "togglewelcome", description: "Enable/disable welcome message" },
+  { command: "removewelcome", description: "Remove welcome message" },
+  { command: "setgoodbye", description: "Set goodbye message (group only)" },
+  { command: "togglegoodbye", description: "Enable/disable goodbye message" },
+  { command: "removegoodbye", description: "Remove goodbye message" },
+  { command: "ban", description: "Ban a user (reply in group)" },
+  { command: "mute", description: "Mute a user (reply in group)" },
+  { command: "unmute", description: "Unmute a user (reply in group)" },
+  { command: "addfilter", description: "Add a banned word (group only)" },
+  { command: "removefilter", description: "Remove a banned word (group only)" },
+  { command: "listfilters", description: "List banned words (group only)" },
+  { command: "spam", description: "Enable/disable spam protection (group only)" },
+  { command: "verify", description: "Start wallet verification (private chat)" },
+  { command: "createbot", description: "Create a new bot (private chat)" },
+  { command: "listbots", description: "List your bots (private chat)" },
+  { command: "editbots", description: "Edit your bots (private chat)" },
+  { command: "deletebot", description: "Delete one of your bots (private chat)" },
+  { command: "premium", description: "Show premium payment options" }
+]);
+
+
 // ======================
 // START BOT
 // ======================
@@ -377,27 +404,53 @@ bot.command("addfilter", async (ctx) => {
 // ======================
 bot.command("help", async (ctx) => {
   const helpMessage = `
-🤖 *Bot Commands*
+🤖 <b>FOMOwl AI Bot Help</b>
+
+<b>General Commands</b>
 /start - Start interacting with the bot
 /help - Show this help menu
-/setwelcome - Set welcome message
-/togglewelcome - Enable/disable welcome message
-/removewelcome - Remove welcome message
-/setgoodbye - Set goodbye message
-/togglegoodbye - Enable/disable goodbye message
-/removegoodbye - Remove goodbye message
-/ban - 🚫 Ban a user (reply to user)
-/mute - 🔇 Mute a user (reply to user)
-/unmute - 🔊 Unmute a user (reply to user)
-/addfilter - ➕ Add a banned word
-/removefilter - ➖ Remove a banned word
-/listfilters - 📃 List banned words
-/spam - 🛡️ Enable/disable spam protection
 
-💡 *Note:* You can use the AI assistant by mentioning the bot or replying to any bot message.
-`;
+<b>Group Management</b>
+/setwelcome - Set a welcome message (group only)
+/togglewelcome on|off - Enable/disable welcome message (group only)
+/removewelcome - Remove the welcome message (group only)
+/setgoodbye - Set a goodbye message (group only)
+/togglegoodbye on|off - Enable/disable goodbye message (group only)
+/removegoodbye - Remove the goodbye message (group only)
+/ban - Ban a user (reply to their message, group only)
+/mute - Mute a user for 2 hours (reply to their message, group only)
+/unmute - Unmute a user (reply to their message, group only)
+/addfilter [word] - Add a banned word or link (group only)
+/removefilter [word] - Remove a banned word or link (group only)
+/listfilters - List all banned words/links (group only)
+/spam on|off - Enable/disable spam protection (group only)
 
-  ctx.reply(helpMessage, { parse_mode: "Markdown" });
+<b>Bot Management (Private Chat)</b>
+/createbot - Create your own Telegram bot
+/listbots - List your created bots
+/editbots - Edit your bots (change description, etc.)
+/deletebot - Delete one of your bots
+
+<b>Wallet & Verification</b>
+/verify - Start wallet verification (private chat only)
+
+<b>Premium Features</b>
+/premium - View premium payment options and upgrade
+
+<b>AI Assistant</b>
+Mention or reply to the bot in any group to use the AI assistant (if enabled for your group).
+
+<b>Notes:</b>
+• Most group commands require you to be an admin.
+• Use commands in private chat for bot management and wallet verification.
+• For full instructions, DM the bot or use /help in your group.
+
+<b>Stay updated:</b>
+Join our <a href="https://t.me/FOMOwlAIbothq">Channel</a> for news, tips, and updates!
+
+<i>Need more help? Contact support or DM the bot owner.</i>
+  `;
+  ctx.reply(helpMessage, { parse_mode: "HTML", disable_web_page_preview: true });
 });
 
 // ======================
