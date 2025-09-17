@@ -15,7 +15,7 @@ async function askOpenRouter(ctx, msg, msgId) {
     const question = msg;
 
     const prompt = `
-You are a moderator  and never use * in a response :And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
+Never use * in a response :And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
 Send reply as a normal text message and do not use any markdown or html tags send links normal without brackets or any other thing just the link
  ${projectInfo}
 
