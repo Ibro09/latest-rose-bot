@@ -45,12 +45,12 @@ export default async function (userBot, botUsername, description, botId) {
       const question = msg;
 
       const prompt = `
-You are a moderator of a group to help assist with questions always replying with paragraphs not listing: And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
-${projectInfo}
+          You are a moderator of a group to help assist with questions always replying with paragraphs not listing: And sound genz and very playful and NOTE: do not use hashtags in the response and DO NOT USE * IN MY RESPONSE!!!!! you can use emojis instead and be very friendly and funny
+          ${projectInfo}
 
-Based on the above, answer the following question:
-${question}
-    `;
+          Based on the above, answer the following question:
+          ${question}
+              `;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
@@ -71,7 +71,7 @@ ${question}
         reply_to_message_id: msgId,
       });
     } catch (error) {
-      console.error(error);
+      console.log(error);
       await ctx.reply(
         "An error occurred while processing your request. Please try again later."
       );
@@ -80,26 +80,34 @@ ${question}
   // Connect to MongoDB
   connectDB(process.env.MONGODB_URI);
 
-
-userBot.telegram.setMyCommands([
-  { command: "start", description: "Start interacting with the bot" },
-  { command: "help", description: "Show help menu" },
-  { command: "setwelcome", description: "Set welcome message (group only)" },
-  { command: "togglewelcome", description: "Enable/disable welcome message" },
-  { command: "removewelcome", description: "Remove welcome message" },
-  { command: "setgoodbye", description: "Set goodbye message (group only)" },
-  { command: "togglegoodbye", description: "Enable/disable goodbye message" },
-  { command: "removegoodbye", description: "Remove goodbye message" },
-  { command: "ban", description: "Ban a user (reply in group)" },
-  { command: "mute", description: "Mute a user (reply in group)" },
-  { command: "unmute", description: "Unmute a user (reply in group)" },
-  { command: "addfilter", description: "Add a banned word (group only)" },
-  { command: "removefilter", description: "Remove a banned word (group only)" },
-  { command: "listfilters", description: "List banned words (group only)" },
-  { command: "spam", description: "Enable/disable spam protection (group only)" },
-  { command: "verify", description: "Start wallet verification (private chat)" },
-  { command: "premium", description: "Show premium payment options" }
-]);
+  userBot.telegram.setMyCommands([
+    { command: "start", description: "Start interacting with the bot" },
+    { command: "help", description: "Show help menu" },
+    { command: "setwelcome", description: "Set welcome message (group only)" },
+    { command: "togglewelcome", description: "Enable/disable welcome message" },
+    { command: "removewelcome", description: "Remove welcome message" },
+    { command: "setgoodbye", description: "Set goodbye message (group only)" },
+    { command: "togglegoodbye", description: "Enable/disable goodbye message" },
+    { command: "removegoodbye", description: "Remove goodbye message" },
+    { command: "ban", description: "Ban a user (reply in group)" },
+    { command: "mute", description: "Mute a user (reply in group)" },
+    { command: "unmute", description: "Unmute a user (reply in group)" },
+    { command: "addfilter", description: "Add a banned word (group only)" },
+    {
+      command: "removefilter",
+      description: "Remove a banned word (group only)",
+    },
+    { command: "listfilters", description: "List banned words (group only)" },
+    {
+      command: "spam",
+      description: "Enable/disable spam protection (group only)",
+    },
+    {
+      command: "verify",
+      description: "Start wallet verification (private chat)",
+    },
+    { command: "premium", description: "Show premium payment options" },
+  ]);
 
   const welcomeMessages = new Map(); // { chatId: welcomeText }
   const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
@@ -131,8 +139,8 @@ userBot.telegram.setMyCommands([
   userBot.start(async (ctx) => {
     try {
       if (ctx.chat.type === "private") {
-          const me = await userBot.telegram.getMe();
-  const botName = me.first_name;
+        const me = await userBot.telegram.getMe();
+        const botName = me.first_name;
         const tgId = ctx.from.id;
         const fullName = `${ctx.from.first_name || ""} ${
           ctx.from.last_name || ""
@@ -178,7 +186,6 @@ userBot.telegram.setMyCommands([
       return ctx.reply("⚠️ Something went wrong. Please try again later.");
     }
   });
-
 
   // ======================
   // SET WLCOME MESSAGE
@@ -469,49 +476,52 @@ userBot.telegram.setMyCommands([
   // ======================
   // HELP
   // ======================
-userBot.command("help", async (ctx) => {
-  const helpMessage = `
-🤖 <b>Bot Help & Commands</b>
+  userBot.command("help", async (ctx) => {
+    const helpMessage = `
+          🤖 <b>Bot Help & Commands</b>
 
-<b>General</b>
-/start - Start interacting with the bot
-/help - Show this help menu
+          <b>General</b>
+          /start - Start interacting with the bot
+          /help - Show this help menu
 
-<b>Group Management</b>
-/setwelcome - Set a welcome message (group only)
-/togglewelcome on|off - Enable or disable welcome messages
-/removewelcome - Remove the welcome message
-/setgoodbye - Set a goodbye message (group only)
-/togglegoodbye on|off - Enable or disable goodbye messages
-/removegoodbye - Remove the goodbye message
+          <b>Group Management</b>
+          /setwelcome - Set a welcome message (group only)
+          /togglewelcome on|off - Enable or disable welcome messages
+          /removewelcome - Remove the welcome message
+          /setgoodbye - Set a goodbye message (group only)
+          /togglegoodbye on|off - Enable or disable goodbye messages
+          /removegoodbye - Remove the goodbye message
 
-<b>Moderation</b>
-/ban - Ban a user (reply to their message, group only)
-/mute - Mute a user for 2 hours (reply to their message, group only)
-/unmute - Unmute a user (reply to their message, group only)
-/addfilter [word] - Add a banned word or link (group only)
-/removefilter [word] - Remove a banned word or link (group only)
-/listfilters - List all banned words/links (group only)
-/spam on|off - Enable or disable spam protection (group only)
+          <b>Moderation</b>
+          /ban - Ban a user (reply to their message, group only)
+          /mute - Mute a user for 2 hours (reply to their message, group only)
+          /unmute - Unmute a user (reply to their message, group only)
+          /addfilter [word] - Add a banned word or link (group only)
+          /removefilter [word] - Remove a banned word or link (group only)
+          /listfilters - List all banned words/links (group only)
+          /spam on|off - Enable or disable spam protection (group only)
 
-<b>Verification</b>
-/verify - Start wallet verification (private chat only)
+          <b>Verification</b>
+          /verify - Start wallet verification (private chat only)
 
-<b>Premium</b>
-/premium - Get premium info (private chat only)
+          <b>Premium</b>
+          /premium - Get premium info (private chat only)
 
-<b>AI Assistant</b>
-Mention or reply to the bot in a group to use the AI assistant (if enabled for your group).
+          <b>AI Assistant</b>
+          Mention or reply to the bot in a group to use the AI assistant (if enabled for your group).
 
-<b>Notes:</b>
-• Most group commands require admin rights.
-• Use commands in private chat for verification and premium info.
-• Welcome and goodbye messages support {name} and {username} placeholders.
+          <b>Notes:</b>
+          • Most group commands require admin rights.
+          • Use commands in private chat for verification and premium info.
+          • Welcome and goodbye messages support {name} and {username} placeholders.
 
-<i>Need more help? Contact your group admin or the bot owner.</i>
-  `;
-  ctx.reply(helpMessage, { parse_mode: "HTML", disable_web_page_preview: true });
-});
+          <i>Need more help? Contact your group admin or the bot owner.</i>
+            `;
+    ctx.reply(helpMessage, {
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    });
+  });
   // ======================
   // REMOVE FILTER
   // ======================
@@ -770,7 +780,7 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
         "✍️ Send settings in format: <tokenAddress> <minAmount> <groupLink>"
       );
     } catch (err) {
-      console.error("Error in /setverify:", err);
+      console.log("Error in /setverify:", err);
       ctx.reply("⚠️ Something went wrong while verifying ownership.");
     }
   });
@@ -821,6 +831,7 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
 
     askOpenRouter(ctx, ctx.message.text, msgId);
   }
+  const addButtonsState = new Map();
 
   // ======================
   // USER THAT LEFT
@@ -866,28 +877,39 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
   // NEW USER
   // ======================
   userBot.on("new_chat_members", async (ctx) => {
-    const chatId = ctx.chat.id;
+    const chatId = ctx.chat.id.toString();
     const newMembers = ctx.message.new_chat_members;
 
-    const chat = ctx.chat;
     console.log(
       "📥 New members joined:",
-      newMembers.map((u) => ({
-        id: u.id,
-        name: u.first_name,
-        username: u.username,
-      }))
+      newMembers.map((u) => u.id)
     );
 
     try {
       const group = await Group.findOne({ groupId: chatId });
 
+      if (!group) {
+        console.log("⚠️ No group settings found for chat", chatId);
+        return;
+      }
+
       console.log("🛠 Group settings:", {
-        isWelcome: group?.isWelcome,
-        welcomeMessage: group?.welcomeMessage,
+        isWelcome: group.isWelcome,
+        welcomeMessage: group.welcomeMessage,
+        hasButtons: group.welcomeButtons?.length > 0,
       });
 
-      if (!group || !group.isWelcome) return;
+      if (!group.isWelcome) return;
+
+      // build inline keyboard if exists
+      let replyMarkup = {};
+      if (group.welcomeButtons && group.welcomeButtons.length > 0) {
+        replyMarkup.reply_markup = {
+          inline_keyboard: group.welcomeButtons.map((btn) => [
+            { text: btn.text, url: btn.url },
+          ]),
+        };
+      }
 
       for (const user of newMembers) {
         let welcomeText = group.welcomeMessage || "";
@@ -900,13 +922,16 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
         if (group.welcomePhotoId) {
           await ctx.replyWithPhoto(group.welcomePhotoId, {
             caption: welcomeText,
+            ...replyMarkup,
           });
         } else {
-          await ctx.reply(welcomeText);
+          await ctx.reply(welcomeText, {
+            ...replyMarkup,
+          });
         }
       }
     } catch (err) {
-      console.log("❌ Error in welcome handler:", err.message);
+      console.log("❌ Error in welcome handler:", err);
     }
   });
 
@@ -1044,7 +1069,7 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
           { parse_mode: "Markdown" }
         );
       } catch (err) {
-        console.error("Error saving verify setup:", err);
+        console.log("Error saving verify setup:", err);
         return ctx.reply("⚠️ Failed to save settings.");
       }
     }
@@ -1105,7 +1130,7 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
           );
         }
       } catch (err) {
-        console.error("Verify error:", err);
+        console.log("Verify error:", err);
         return ctx.reply("⚠️ Error checking balance. Try again later.");
       }
     }
@@ -1128,6 +1153,7 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
 
     // Handle welcome message setup (text or photo)
     if (setWelcomeState.get(chatId) === userId) {
+      console.log("aaaaaaaaaaaaa");
       if (ctx.message.photo) {
         // User sent a photo
         const photoArray = ctx.message.photo;
@@ -1148,7 +1174,17 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
         );
         setWelcomeState.delete(chatId);
         return ctx.reply(
-          "✅ Welcome image and caption have been saved and enabled!"
+          "✅ Welcome image and caption have been saved and enabled!",
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "➕ Yes, add buttons", callback_data: "add_buttons" },
+                  { text: "❌ No, skip", callback_data: "skip_buttons" },
+                ],
+              ],
+            },
+          }
         );
       } else if (ctx.message.text) {
         // User sent text only
@@ -1165,7 +1201,16 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
           { upsert: true, new: true }
         );
         setWelcomeState.delete(chatId);
-        return ctx.reply("✅ Welcome message has been saved and enabled!");
+        return ctx.reply("✅ Welcome message has been saved and enabled!", {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "➕ Yes, add buttons", callback_data: "add_buttons" },
+                { text: "❌ No, skip", callback_data: "skip_buttons" },
+              ],
+            ],
+          },
+        });
       }
     }
 
@@ -1210,6 +1255,34 @@ Mention or reply to the bot in a group to use the AI assistant (if enabled for y
       }
     }
 
+    if (addButtonsState.get(chatId) === userId) {
+      const input = ctx.message.text.trim();
+      const lines = input.split("\n");
+
+      const buttons = [];
+      for (let line of lines) {
+        const parts = line.split("-");
+        if (parts.length === 2) {
+          const text = parts[0].trim();
+          const url = parts[1].trim();
+          buttons.push({ text, url });
+        }
+      }
+      console.log(buttons);
+
+      const group = await Group.findOneAndUpdate(
+        { groupId: chatId },
+        { $set: { welcomeButtons: buttons } },
+        { upsert: true, new: true }
+      );
+      console.log(group);
+
+      addButtonsState.delete(chatId);
+
+      return ctx.reply(
+        "✅ Buttons saved along with the welcome message!,please ensure the link is valid"
+      );
+    }
     // =====================================================
     // 1️⃣ BANNED WORDS CHECK
     // =====================================================

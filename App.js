@@ -13,6 +13,8 @@ import connectDB from "./models/PremiumDb.js"; // adjust path if needed
 import Premium from "./models/Premium.js"; // adjust path if needed
 import { ethers } from "ethers";
 import Fomowl from "./models/Fomowl.js";
+import { log } from "console";
+import { Log } from "ethers";
 
 dotenv.config();
 const botsFile = "./bots.json";
@@ -31,11 +33,12 @@ connectDB(process.env.MONGODB_URI);
 
 const welcomeMessages = new Map(); // { chatId: welcomeText }
 const userSpamMap = new Map(); // { groupId: { userId: [timestamps] } }
-const setWelcomeState = new Map(); // chatId -> userId 
+const setWelcomeState = new Map(); // chatId -> userId
 const setGoodbyeState = new Map(); // chatId -> userId
 const newBotToken = new Map(); // userId -> true
 const paymentWallets = new Map(); // userId -> walletAddress
 const paymentWalletsPrivateKeys = new Map(); // userId -> privateKey
+const addButtonsState = new Map();
 
 // Set command suggestions
 bot.telegram.setMyCommands([
@@ -53,15 +56,23 @@ bot.telegram.setMyCommands([
   { command: "addfilter", description: "Add a banned word (group only)" },
   { command: "removefilter", description: "Remove a banned word (group only)" },
   { command: "listfilters", description: "List banned words (group only)" },
-  { command: "spam", description: "Enable/disable spam protection (group only)" },
-  { command: "verify", description: "Start wallet verification (private chat)" },
+  {
+    command: "spam",
+    description: "Enable/disable spam protection (group only)",
+  },
+  {
+    command: "verify",
+    description: "Start wallet verification (private chat)",
+  },
   { command: "createbot", description: "Create a new bot (private chat)" },
   { command: "listbots", description: "List your bots (private chat)" },
   { command: "editbots", description: "Edit your bots (private chat)" },
-  { command: "deletebot", description: "Delete one of your bots (private chat)" },
-  { command: "premium", description: "Show premium payment options" }
+  {
+    command: "deletebot",
+    description: "Delete one of your bots (private chat)",
+  },
+  { command: "premium", description: "Show premium payment options" },
 ]);
-
 
 // ======================
 // START BOT
@@ -75,15 +86,43 @@ bot.start(async (ctx) => {
       }`.trim();
       const username = ctx.from.username;
 
-      // ✅ Save user to database if not already present
-      const existingUser = await User.findOne({ userId: tgId });
+      // Check for referral parameter
+      let referrerId = null;
+      if (ctx.startPayload) {
+        referrerId = ctx.startPayload; // This is the userId of the referrer
+      }
+
+      // Save user to database if not already present
+      let existingUser = await User.findOne({ userId: tgId });
+      console.log(referrerId);
+
       if (!existingUser) {
-        await new User({ userId: tgId, username }).save();
+        existingUser = await new User({
+          userId: tgId,
+          username,
+          referrer: referrerId,
+        }).save();
         console.log(`🆕 New user saved: ${tgId}`);
+
+        // Optionally, reward the referrer
+        if (referrerId && referrerId !== tgId) {
+          await User.updateOne(
+            { userId: referrerId },
+            { $inc: { referrals: 1 } }
+          );
+          // Optionally, send a message to the referrer
+          try {
+            await ctx.telegram.sendMessage(
+              referrerId,
+              `🎉 You referred ${fullName} (@${username}) and earned a reward!`
+            );
+          } catch (e) {
+            console.log("Couldn't notify referrer:", e.message);
+          }
+        }
       } else {
         console.log(`👤 Returning user: ${tgId}`);
       }
-
       return ctx.reply(
         `👋 Hey <b>${fullName}</b>!\n` +
           `I’m <b>FOMOwl AI Chatbot</b> – your all in one community assistant.\n\n` +
@@ -100,6 +139,10 @@ bot.start(async (ctx) => {
                 "➕ Add me to your group!",
                 "https://t.me/FOMOwlAIbot?startgroup"
               ),
+              Markup.button.callback(
+                "🎁 Get Referral Link",
+                "get_referral_link"
+              ),
             ],
           ]),
         }
@@ -115,20 +158,41 @@ bot.start(async (ctx) => {
   }
 });
 
+bot.action("get_referral_link", async (ctx) => {
+  const userId = ctx.from.id;
+  const link = `https://t.me/${ctx.botInfo.username}?start=${userId}`;
+  await ctx.reply(
+    `🔗 Your referral link:\n${link}\n\nShare this link with friends! When they start the bot, you'll get credit.`
+  );
+  await ctx.answerCbQuery();
+});
+
+bot.command("mystats", async (ctx) => {
+  const user = await User.findOne({ userId: ctx.from.id });
+  await ctx.reply(
+    `👤 You have referred <b>${user?.referrals || 0}</b> users.`,
+    { parse_mode: "HTML" }
+  );
+});
+
 // ======================
-// SET WLCOME MESSAGE
+// SET WELCOME MESSAGE
 // ======================
 bot.command("setwelcome", async (ctx) => {
   const chatId = ctx.chat.id;
   if (!["group", "supergroup"].includes(ctx.chat.type)) {
     return ctx.reply("❌ This command is for groups only.");
   }
+
   const admins = await ctx.getChatAdministrators();
   const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id);
   if (!isAdmin) {
     return ctx.reply("🚫 Only admins can set the welcome message.");
   }
+
+  // Save admin id for this chat so you know who's setting the message
   setWelcomeState.set(chatId, ctx.from.id);
+
   return ctx.reply("✍️ Please send the welcome message you want to set.");
 });
 
@@ -450,7 +514,10 @@ Join our <a href="https://t.me/FOMOwlAIbothq">Channel</a> for news, tips, and up
 
 <i>Need more help? Contact support or DM the bot owner.</i>
   `;
-  ctx.reply(helpMessage, { parse_mode: "HTML", disable_web_page_preview: true });
+  ctx.reply(helpMessage, {
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+  });
 });
 
 // ======================
@@ -791,7 +858,7 @@ bot.action(/^edit:(.+)$/, async (ctx) => {
       ownerUsername = `@${user.username}`;
     }
   } catch (err) {
-    console.error("Error fetching owner username:", err.message);
+    console.log("Error fetching owner username:", err.message);
   }
 
   // Fetch bot name from its ID
@@ -802,7 +869,7 @@ bot.action(/^edit:(.+)$/, async (ctx) => {
       botName = botChat.first_name || botChat.username || "🚫";
     }
   } catch (err) {
-    console.error("Error fetching bot name:", err.message);
+    console.log("Error fetching bot name:", err.message);
   }
 
   // Prepare the bot info text
@@ -958,7 +1025,7 @@ bot.command("premium", async (ctx) => {
       Markup.inlineKeyboard(keyboard)
     );
   } catch (err) {
-    console.error("Premium command error:", err);
+    console.log("Premium command error:", err);
     return ctx.reply("⚠️ Failed to load premium options. Try again later.");
   }
 });
@@ -1311,27 +1378,39 @@ bot.on("left_chat_member", async (ctx) => {
 // NEW USER
 // ======================
 bot.on("new_chat_members", async (ctx) => {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.chat.id.toString();
   const newMembers = ctx.message.new_chat_members;
 
   console.log(
     "📥 New members joined:",
-    newMembers.map((u) => ({
-      id: u.id,
-      name: u.first_name,
-      username: u.username,
-    }))
+    newMembers.map((u) => u.id)
   );
 
   try {
     const group = await Group.findOne({ groupId: chatId });
 
+    if (!group) {
+      console.log("⚠️ No group settings found for chat", chatId);
+      return;
+    }
+
     console.log("🛠 Group settings:", {
-      isWelcome: group?.isWelcome,
-      welcomeMessage: group?.welcomeMessage,
+      isWelcome: group.isWelcome,
+      welcomeMessage: group.welcomeMessage,
+      hasButtons: group.welcomeButtons?.length > 0,
     });
 
-    if (!group || !group.isWelcome) return;
+    if (!group.isWelcome) return;
+
+    // build inline keyboard if exists
+    let replyMarkup = {};
+    if (group.welcomeButtons && group.welcomeButtons.length > 0) {
+      replyMarkup.reply_markup = {
+        inline_keyboard: group.welcomeButtons.map((btn) => [
+          { text: btn.text, url: btn.url },
+        ]),
+      };
+    }
 
     for (const user of newMembers) {
       let welcomeText = group.welcomeMessage || "";
@@ -1344,13 +1423,16 @@ bot.on("new_chat_members", async (ctx) => {
       if (group.welcomePhotoId) {
         await ctx.replyWithPhoto(group.welcomePhotoId, {
           caption: welcomeText,
+          ...replyMarkup,
         });
       } else {
-        await ctx.reply(welcomeText);
+        await ctx.reply(welcomeText, {
+          ...replyMarkup,
+        });
       }
     }
   } catch (err) {
-    console.log("❌ Error in welcome handler:", err.message);
+    console.log("❌ Error in welcome handler:", err);
   }
 });
 
@@ -1364,8 +1446,8 @@ bot.on("my_chat_member", async (ctx) => {
 
   // Bot was added to a group
   if (
-    ["left", "kicked"].includes(oldStatus) &&
-    ["member", "administrator"].includes(newStatus)
+   ["left", "kicked"].includes(oldStatus) &&
+  ["member", "administrator"].includes(newStatus)
   ) {
     const addedBy = ctx.update.my_chat_member.from;
     const userId = addedBy.id;
@@ -1464,14 +1546,34 @@ bot.on("document", async (ctx) => {
     const fileText = response.data.toString("utf8");
 
     // Send back the text
-    await ctx.reply("📄 File Content:\n\n" + fileText);
+    // await ctx.reply("📄 File Content:\n\n" + fileText);
 
     // Optional: save to disk
     fs.writeFileSync("uploaded_code.js", fileText, "utf8");
     console.log("File saved as uploaded_code.js");
   } catch (err) {
-    console.error(err);
+    console.log(err);
     ctx.reply("❌ Failed to read file.");
+  }
+});
+
+bot.on("callback_query", async (ctx) => {
+  const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  const data = ctx.callbackQuery.data;
+
+  if (data === "add_buttons") {
+    await ctx.answerCbQuery();
+    addButtonsState.set(chatId, userId);
+    return ctx.reply(
+      "🔗 Send your buttons in this format:\n\n`Button Text - https://link.com`\n\n➡️ You can send multiple lines for multiple buttons.",
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  if (data === "skip_buttons") {
+    await ctx.answerCbQuery();
+    return ctx.reply("✅ Welcome message saved without buttons!");
   }
 });
 
@@ -1520,7 +1622,7 @@ bot.on("message", async (ctx) => {
         { parse_mode: "Markdown" }
       );
     } catch (err) {
-      console.error("Error saving verify setup:", err);
+      console.log("Error saving verify setup:", err);
       return ctx.reply("⚠️ Failed to save settings.");
     }
   }
@@ -1581,7 +1683,7 @@ bot.on("message", async (ctx) => {
         );
       }
     } catch (err) {
-      console.error("Verify error:", err);
+      console.log("Verify error:", err);
       return ctx.reply("⚠️ Error checking balance. Try again later.");
     }
   }
@@ -1664,7 +1766,7 @@ bot.on("message", async (ctx) => {
       // Start the bot immediately
       startUserBot(token, me.username, "", me.id); // Pass botId to startUserBot
     } catch (err) {
-      console.error(err);
+      console.log(err);
       ctx.reply("❌ Could not connect to bot. Check your token.");
     }
   } // ===== TRANSACTION HASH HANDLER =====
@@ -1804,13 +1906,14 @@ bot.on("message", async (ctx) => {
         await ctx.reply(`❌ Could not verify payment: ${result.message}`);
       }
     } catch (error) {
-      console.error(error);
+      console.log(error);
       return ctx.reply("❌ Error processing transaction.");
     }
   }
 
   // Handle welcome message setup (text or photo)
   if (setWelcomeState.get(chatId) === userId) {
+    console.log("aaaaaaaaaaaaa");
     if (ctx.message.photo) {
       // User sent a photo
       const photoArray = ctx.message.photo;
@@ -1831,7 +1934,17 @@ bot.on("message", async (ctx) => {
       );
       setWelcomeState.delete(chatId);
       return ctx.reply(
-        "✅ Welcome image and caption have been saved and enabled!"
+        "✅ Welcome image and caption have been saved and enabled!",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "➕ Yes, add buttons", callback_data: "add_buttons" },
+                { text: "❌ No, skip", callback_data: "skip_buttons" },
+              ],
+            ],
+          },
+        }
       );
     } else if (ctx.message.text) {
       // User sent text only
@@ -1848,7 +1961,16 @@ bot.on("message", async (ctx) => {
         { upsert: true, new: true }
       );
       setWelcomeState.delete(chatId);
-      return ctx.reply("✅ Welcome message has been saved and enabled!");
+      return ctx.reply("✅ Welcome message has been saved and enabled!", {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "➕ Yes, add buttons", callback_data: "add_buttons" },
+              { text: "❌ No, skip", callback_data: "skip_buttons" },
+            ],
+          ],
+        },
+      });
     }
   }
 
@@ -1893,6 +2015,34 @@ bot.on("message", async (ctx) => {
     }
   }
 
+  if (addButtonsState.get(chatId) === userId) {
+    const input = ctx.message.text.trim();
+    const lines = input.split("\n");
+
+    const buttons = [];
+    for (let line of lines) {
+      const parts = line.split("-");
+      if (parts.length === 2) {
+        const text = parts[0].trim();
+        const url = parts[1].trim();
+        buttons.push({ text, url });
+      }
+    }
+    console.log(buttons);
+
+    const group = await Group.findOneAndUpdate(
+      { groupId: chatId },
+      { $set: { welcomeButtons: buttons } },
+      { upsert: true, new: true }
+    );
+    console.log(group);
+
+    addButtonsState.delete(chatId);
+
+    return ctx.reply(
+      "✅ Buttons saved along with the welcome message!,please ensure the link is valid"
+    );
+  }
   // =====================================================
   // 1️⃣ BANNED WORDS CHECK
   // =====================================================
@@ -1962,43 +2112,6 @@ bot.on("message", async (ctx) => {
       }
     } catch (err) {
       console.log("⚠️ Error sending goodbye message:", err.message);
-    }
-  }
-
-  // =====================================================
-  // 3️⃣ WELCOME MESSAGE
-  // =====================================================
-  if (ctx.message.new_chat_members?.length > 0) {
-    const newMembers = ctx.message.new_chat_members;
-
-    try {
-      const group = await Group.findOne({ groupId: chatId });
-
-      if (
-        group?.isWelcome &&
-        (group.welcomeMessage?.trim() || group.welcomePhotoId)
-      ) {
-        for (const user of newMembers) {
-          let welcomeText = group.welcomeMessage || "";
-          welcomeText = welcomeText.replace(/{name}/g, user.first_name);
-          welcomeText = welcomeText.replace(
-            /{username}/g,
-            user.username ? `@${user.username}` : user.first_name
-          );
-
-          if (group.welcomePhotoId) {
-            await ctx.replyWithPhoto(group.welcomePhotoId, {
-              caption: welcomeText,
-            });
-          } else {
-            await ctx.reply(welcomeText);
-          }
-        }
-      } else {
-        console.log("⚠️ Welcome message disabled or not set.");
-      }
-    } catch (err) {
-      console.log("❌ Error in welcome handler:", err.message);
     }
   }
 
