@@ -162,7 +162,8 @@ bot.action("get_referral_link", async (ctx) => {
   const userId = ctx.from.id;
   const link = `https://t.me/${ctx.botInfo.username}?start=${userId}`;
   await ctx.reply(
-    `🔗 Your referral link:\n${link}\n\nShare this link with friends! When they start the bot, you'll get credit.`
+    `Share your referral link with friends!
+Whenever someone uses your link to purchase Premium, you’ll earn 10% of their payment. Simple and rewarding.\n\n🔗 Your referral link:\n${link}\n\n`
   );
   await ctx.answerCbQuery();
 });
@@ -1459,7 +1460,7 @@ bot.on("my_chat_member", async (ctx) => {
     console.log(
       `✅ Bot added to ${chat.title} by ${fullName} (@${username}) [${userId}]`
     );
-    const groupCount = await Group.countDocuments({});
+    const groupCount = await Group.countDocuments({userId});
     console.log(`Bot is now in ${groupCount} groups.`);
     if (groupCount >= 6) {
       // Leave the group
@@ -1528,34 +1529,34 @@ bot.on("my_chat_member", async (ctx) => {
 });
 
 // Listen for documents
-bot.on("document", async (ctx) => {
-  console.log("📄 Document received:", ctx.message.document);
+// bot.on("document", async (ctx) => {
+//   console.log("📄 Document received:", ctx.message.document);
 
-  try {
-    const fileId = ctx.message.document.file_id;
+//   try {
+//     const fileId = ctx.message.document.file_id;
 
-    // Get file path from Telegram
-    const fileLink = await ctx.telegram.getFileLink(fileId);
+//     // Get file path from Telegram
+//     const fileLink = await ctx.telegram.getFileLink(fileId);
 
-    // Download file content
-    const response = await axios.get(fileLink.href, {
-      responseType: "arraybuffer",
-    });
+//     // Download file content
+//     const response = await axios.get(fileLink.href, {
+//       responseType: "arraybuffer",
+//     });
 
-    // Convert to text (assuming UTF-8 encoding)
-    const fileText = response.data.toString("utf8");
+//     // Convert to text (assuming UTF-8 encoding)
+//     const fileText = response.data.toString("utf8");
 
-    // Send back the text
-    // await ctx.reply("📄 File Content:\n\n" + fileText);
+//     // Send back the text
+//     // await ctx.reply("📄 File Content:\n\n" + fileText);
 
-    // Optional: save to disk
-    fs.writeFileSync("uploaded_code.js", fileText, "utf8");
-    console.log("File saved as uploaded_code.js");
-  } catch (err) {
-    console.log(err);
-    ctx.reply("❌ Failed to read file.");
-  }
-});
+//     // Optional: save to disk
+//     fs.writeFileSync("uploaded_code.js", fileText, "utf8");
+//     console.log("File saved as uploaded_code.js");
+//   } catch (err) {
+//     console.log(err);
+//     ctx.reply("❌ Failed to read file.");
+//   }
+// });
 
 bot.on("callback_query", async (ctx) => {
   const chatId = ctx.chat.id;
